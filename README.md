@@ -1,6 +1,6 @@
 # hvif-tools
 
-A small set of command‑line tools to work with the Haiku Vector Icon Format (HVIF): convert HVIF → SVG (hvif2svg) and SVG → HVIF (svg2hvif). Handy for inspection, round‑tripping, and integrating HVIF assets into modern pipelines.
+A small set of command‑line tools to work with the Haiku Vector Icon Format (HVIF)
 
 ## Features
 - hvif2svg
