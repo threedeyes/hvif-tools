@@ -15,7 +15,6 @@ A small set of command‑line tools to work with the Haiku Vector Icon Format (H
   - Normalizes coordinates to HVIF’s 64 × 64 space and centers content.
   - Converts fill and stroke (caps/joins/miter limit), stroke widths, and opacity.
   - Linear and radial gradients with calculated HVIF gradient transforms.
-  - CLI and buffer‑to‑buffer example for embedding into apps/pipelines.
 
 - Cross‑platform: Linux, macOS, Windows and Haiku
 
