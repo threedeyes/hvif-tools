@@ -19,6 +19,15 @@ std::string ToString(T value) {
 	return oss.str();
 }
 
+static inline std::string FormatFixed(double value, int precision)
+{
+	std::ostringstream oss;
+	oss.setf(std::ios::fixed, std::ios::floatfield);
+	oss.precision(precision);
+	oss << value;
+	return oss.str();
+}
+
 SVGRenderer::SVGRenderer() : fIdCounter(0)
 {
 }
@@ -125,10 +134,11 @@ SVGRenderer::_GradientToSVG(const Gradient& grad, const std::string& id)
 		std::string stopColor = _ColorToCSS(stop.color);
 		float alpha = _GetColorAlpha(stop.color);
 
-		svg << "<stop offset=\"" << std::fixed << std::setprecision(2) << offset << "%\" stop-color=\"" << stopColor << "\"";
+		svg << "<stop offset=\"" << FormatFixed(offset, 2)
+		    << "%\" stop-color=\"" << stopColor << "\"";
 
 		if (alpha < 1.0f) {
-			svg << " stop-opacity=\"" << std::fixed << std::setprecision(2) << alpha << "\"";
+			svg << " stop-opacity=\"" << FormatFixed(alpha, 2) << "\"";
 		}
 
 		svg << " />\n";
