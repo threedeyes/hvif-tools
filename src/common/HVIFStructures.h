@@ -8,8 +8,9 @@
 
 #include <vector>
 #include <string>
-#include <cstdint>
 #include <algorithm>
+
+#include <stdint.h>
 
 namespace hvif {
 
