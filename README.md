@@ -26,7 +26,7 @@ Requirements:
 
 Commands:
 ```bash
-git clone https://github.com/your-org/hvif-tools.git
+git clone https://github.com/your-org/hvif-tools.git  --recursive
 cd hvif-tools
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
