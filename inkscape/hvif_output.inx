@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+    <name>HVIF Output</name>
+    <id>org.inkscape.output.hvif</id>
+    <dependency type="executable" location="path">svg2hvif</dependency>
+    <dependency type="executable" location="path">python3</dependency>
+    <output>
+        <extension>.hvif</extension>
+        <mimetype>image/x-hvif</mimetype>
+        <filetypename>Haiku Vector Icon Format (*.hvif)</filetypename>
+        <filetypetooltip>Export to Haiku Vector Icon Format</filetypetooltip>
+    </output>
+    <script>
+        <command location="inx" interpreter="python">hvif_output.py</command>
+    </script>
+</inkscape-extension>
