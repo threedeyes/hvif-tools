@@ -3,7 +3,6 @@
     <name>HVIF Input</name>
     <id>org.inkscape.input.hvif</id>
     <dependency type="executable" location="path">hvif2svg</dependency>
-    <dependency type="executable" location="path">python3</dependency>
     <input>
         <extension>.hvif</extension>
         <mimetype>image/x-hvif</mimetype>
