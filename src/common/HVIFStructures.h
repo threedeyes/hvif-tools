@@ -14,6 +14,13 @@
 
 namespace hvif {
 
+// HVIF format limitations
+enum HVIFLimits {
+	MAX_STYLES = 255,
+	MAX_PATHS = 255,
+	MAX_SHAPES = 255
+};
+
 enum ColorTags {
 	RGBA = 1,
 	RGB = 3, 

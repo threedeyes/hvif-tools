@@ -1,3 +1,4 @@
+// Filename: ./svg2hvif/HVIFWriter.cpp
 /*
  * Copyright 2025, Gerasim Troeglazov, 3dEyes@gmail.com. All rights reserved.
  * Distributed under the terms of the MIT License.
@@ -19,6 +20,25 @@ static T clamp_value(const T& value, const T& min_val, const T& max_val) {
 
 static long round_to_long(double x) {
 	return static_cast<long>(x + (x >= 0 ? 0.5 : -0.5));
+}
+
+bool
+HVIFWriter::CheckHVIFLimitations() const
+{
+	if (fStyles.size() > MAX_STYLES) {
+		return false;
+	}
+
+	size_t totalPaths = fPaths.size() + fInternalPaths.size();
+	if (totalPaths > MAX_PATHS) {
+		return false;
+	}
+
+	if (fShapes.size() > MAX_SHAPES) {
+		return false;
+	}
+
+	return true;
 }
 
 uint8_t
@@ -318,6 +338,9 @@ HVIFWriter::_WriteShapeData(std::vector<uint8_t>& buffer, const Shape& shape)
 std::vector<uint8_t>
 HVIFWriter::GetData()
 {
+	if (!CheckHVIFLimitations())
+		return std::vector<uint8_t>();
+
 	std::vector<uint8_t> data;
 	_WriteByte(data, 'n'); _WriteByte(data, 'c'); _WriteByte(data, 'i'); _WriteByte(data, 'f');
 
@@ -359,6 +382,9 @@ bool
 HVIFWriter::WriteToFile(const std::string& filename)
 {
 	std::vector<uint8_t> data = GetData();
+	if (data.empty())
+		return false;
+
 	std::ofstream file(filename.c_str(), std::ios::binary);
 	if (!file.is_open()) return false;
 	file.write(reinterpret_cast<const char*>(&data[0]), data.size());

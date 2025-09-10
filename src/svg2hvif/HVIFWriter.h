@@ -55,6 +55,8 @@ struct InternalPath {
 
 class HVIFWriter {
 public:
+	HVIFWriter() {}
+
 	uint8_t AddStyle(const Style& style);
 	uint8_t AddPath(const Path& path);
 	uint8_t AddInternalPath(const InternalPath& path);
@@ -66,6 +68,12 @@ public:
 	bool WriteToBuffer(std::vector<uint8_t>& buffer);
 
 	std::vector<uint8_t> GetData();
+
+	bool CheckHVIFLimitations() const;
+
+	size_t GetStylesCount() const { return fStyles.size(); }
+	size_t GetPathsCount() const { return fPaths.size() + fInternalPaths.size(); }
+	size_t GetShapesCount() const { return fShapes.size(); }
 
 private:
 	std::vector<Style> fStyles;
