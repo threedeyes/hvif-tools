@@ -134,7 +134,7 @@ SVGRenderer::_GradientToSVG(const Gradient& grad, const std::string& id)
 {
 	std::ostringstream svg;
 
-	std::string tagName = (grad.type == LINEAR) ? "linearGradient" : "radialGradient";
+	std::string tagName = (grad.type == LINEAR || grad.type == CONIC) ? "linearGradient" : "radialGradient";
 
 	svg << "<" << tagName << " id=\"" << id << "\" gradientUnits=\"userSpaceOnUse\"";
 
@@ -145,6 +145,12 @@ SVGRenderer::_GradientToSVG(const Gradient& grad, const std::string& id)
 	if (grad.type == LINEAR) {
 		float x1 = -64.0f * 102;
 		float x2 = 64.0f * 102;
+		float y1 = -64.0f * 102;
+		float y2 = -64.0f * 102;
+		svg << " x1=\"" << x1 << "\" x2=\"" << x2 << "\" y1=\"" << y1 << "\" y2=\"" << y2 << "\"";
+	} else if (grad.type == CONIC) {
+		float x1 = 64.0f * 102;
+		float x2 = -64.0f * 102;
 		float y1 = -64.0f * 102;
 		float y2 = -64.0f * 102;
 		svg << " x1=\"" << x1 << "\" x2=\"" << x2 << "\" y1=\"" << y1 << "\" y2=\"" << y2 << "\"";
