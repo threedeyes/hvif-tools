@@ -72,6 +72,7 @@ HVIFWriter::_WriteByte(std::vector<uint8_t>& buffer, uint8_t byte)
 void
 HVIFWriter::_WriteCoord(std::vector<uint8_t>& buffer, float coord)
 {
+	coord = floor(coord * 102.0f + 0.5f) / 102.0f;
 	if (coord >= -32.0f && coord <= 95.0f && fmod(coord, 1.0f) == 0.0f) {
 		_WriteByte(buffer, static_cast<uint8_t>(coord + 32.0f));
 	} else {
@@ -84,10 +85,13 @@ HVIFWriter::_WriteCoord(std::vector<uint8_t>& buffer, float coord)
 void
 HVIFWriter::_WriteFloat24(std::vector<uint8_t>& buffer, float value)
 {
-	if (value == 0.0f) { 
+	if (fabs(value) < 1e-6f) {
 		_WriteByte(buffer, 0); _WriteByte(buffer, 0); _WriteByte(buffer, 0); 
 		return; 
 	}
+
+	value = floor(value * 1000000.0f + 0.5f) / 1000000.0f;
+
 	uint32_t bits;
 	memcpy(&bits, &value, sizeof(bits));
 	int32_t exponent = ((bits >> 23) & 0xFF) - 127;

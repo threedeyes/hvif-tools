@@ -28,6 +28,32 @@ static inline std::string FormatFixed(double value, int precision)
 	return oss.str();
 }
 
+static inline bool IsLinearCurve(float x1, float y1, float cx1, float cy1,
+								float cx2, float cy2, float x2, float y2)
+{
+	const float epsilon = 1.0f;
+
+	float dx = x2 - x1;
+	float dy = y2 - y1;
+	float len = sqrt(dx * dx + dy * dy);
+
+	if (len < epsilon)
+		return true;
+
+	dx /= len;
+	dy /= len;
+
+	float d1x = cx1 - x1;
+	float d1y = cy1 - y1;
+	float cross1 = fabs(d1x * dy - d1y * dx);
+
+	float d2x = cx2 - x1;
+	float d2y = cy2 - y1;
+	float cross2 = fabs(d2x * dy - d2y * dx);
+
+	return (cross1 < epsilon && cross2 < epsilon);
+}
+
 SVGRenderer::SVGRenderer() : fIdCounter(0)
 {
 }
@@ -250,16 +276,20 @@ std::string
 SVGRenderer::_PathToSVG(const std::vector<Path>& paths)
 {
 	std::ostringstream pathData;
-	
+
 	for (int idx = static_cast<int>(paths.size()) - 1; idx >= 0; idx--) {
 		const Path& path = paths[idx];
-		
+
 		if (path.type == "points") {
 			if (path.points.size() >= 2) {
-				pathData << "M " << path.points[0] << " " << path.points[1] << " L";
-				for (size_t i = 2; i < path.points.size(); i++) {
-					pathData << " " << path.points[i];
+				pathData << "M " << path.points[0] << " " << path.points[1];
+
+				for (size_t i = 2; i < path.points.size(); i += 2) {
+					if (i + 1 < path.points.size()) {
+						pathData << " L " << path.points[i] << " " << path.points[i + 1];
+					}
 				}
+
 				if (path.closed) {
 					pathData << " Z";
 				}
@@ -281,9 +311,17 @@ SVGRenderer::_PathToSVG(const std::vector<Path>& paths)
 					float yin = path.points[i + 3];
 					float xout_next = path.points[i + 4];
 					float yout_next = path.points[i + 5];
-					
-					pathData << " C " << xout << " " << yout << " " 
-							 << xin << " " << yin << " " << x << " " << y;
+
+					float prevX = (i == 6) ? x0 : path.points[i-6];
+					float prevY = (i == 6) ? y0 : path.points[i-5];
+
+					if (fabs(xout - prevX) < 1e-3f && fabs(yout - prevY) < 1e-3f &&
+						fabs(xin - x) < 1e-3f && fabs(yin - y) < 1e-3f) {
+						pathData << " L " << x << " " << y;
+					} else {
+						pathData << " C " << xout << " " << yout << " "
+								 << xin << " " << yin << " " << x << " " << y;
+					}
 
 					xout = xout_next;
 					yout = yout_next;
@@ -293,8 +331,22 @@ SVGRenderer::_PathToSVG(const std::vector<Path>& paths)
 			if (path.closed && path.points.size() >= 6) {
 				float xin0 = path.points[2];
 				float yin0 = path.points[3];
-				pathData << " C " << xout << " " << yout << " " 
-						 << xin0 << " " << yin0 << " " << x0 << " " << y0;
+
+				size_t lastSegmentStart = path.points.size() - 6;
+				float lastX = path.points[lastSegmentStart];
+				float lastY = path.points[lastSegmentStart + 1];
+
+				bool alreadyAtStart = (fabs(lastX - x0) < 1e-3f && fabs(lastY - y0) < 1e-3f);
+
+				if (!alreadyAtStart) {
+					if (fabs(xout - lastX) < 1e-3f && fabs(yout - lastY) < 1e-3f &&
+						fabs(xin0 - x0) < 1e-3f && fabs(yin0 - y0) < 1e-3f) {
+						pathData << " L " << x0 << " " << y0;
+					} else {
+						pathData << " C " << xout << " " << yout << " "
+								 << xin0 << " " << yin0 << " " << x0 << " " << y0;
+					}
+				}
 				pathData << " Z";
 			}
 			pathData << " ";
@@ -324,10 +376,10 @@ SVGRenderer::_MatrixToSVG(const std::vector<float>& matrix)
 {
 	if (matrix.size() >= 6) {
 		std::ostringstream result;
-		result << "matrix(" << matrix[0] << " " << matrix[1] << " " 
-			   << matrix[2] << " " << matrix[3] << " " 
-			   << (matrix[4] * 102) << " " << (matrix[5] * 102) << ")";
-		return result.str();        
+		result << "matrix(" << FormatFixed(matrix[0], 6) << " " << FormatFixed(matrix[1], 6) << " "
+			   << FormatFixed(matrix[2], 6) << " " << FormatFixed(matrix[3], 6) << " "
+			   << FormatFixed(matrix[4] * 102, 2) << " " << FormatFixed(matrix[5] * 102, 2) << ")";
+		return result.str();
 	}
 	return "";
 }

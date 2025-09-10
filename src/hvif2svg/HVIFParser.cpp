@@ -447,8 +447,9 @@ HVIFParser::_ReadControls(std::vector<float>& points, uint8_t pointCount)
 			case VLINE: {
 				if (!_ReadCoords(coords, 1)) return false;
 				std::vector<float> p(6);
-				p[0] = coords[0]; p[1] = lastPoint[1]; p[2] = coords[0]; 
-				p[3] = lastPoint[1]; p[4] = coords[0]; p[5] = lastPoint[1];
+				p[0] = coords[0]; p[1] = lastPoint[1];
+				p[2] = coords[0]; p[3] = lastPoint[1];
+				p[4] = coords[0]; p[5] = lastPoint[1];
 				points.insert(points.end(), p.begin(), p.end());
 				lastPoint = p;
 				break;
@@ -457,8 +458,9 @@ HVIFParser::_ReadControls(std::vector<float>& points, uint8_t pointCount)
 			case HLINE: {
 				if (!_ReadCoords(coords, 1)) return false;
 				std::vector<float> p(6);
-				p[0] = lastPoint[0]; p[1] = coords[0]; p[2] = lastPoint[0]; 
-				p[3] = coords[0]; p[4] = lastPoint[0]; p[5] = coords[0];
+				p[0] = lastPoint[0]; p[1] = coords[0];
+				p[2] = lastPoint[0]; p[3] = coords[0];
+				p[4] = lastPoint[0]; p[5] = coords[0];
 				points.insert(points.end(), p.begin(), p.end());
 				lastPoint = p;
 				break;
@@ -468,8 +470,9 @@ HVIFParser::_ReadControls(std::vector<float>& points, uint8_t pointCount)
 				std::vector<float> coordX, coordY;
 				if (!_ReadCoords(coordX, 1) || !_ReadCoords(coordY, 1)) return false;
 				std::vector<float> p(6);
-				p[0] = coordX[0]; p[1] = coordY[0]; p[2] = coordX[0]; 
-				p[3] = coordY[0]; p[4] = coordX[0]; p[5] = coordY[0];
+				p[0] = coordX[0]; p[1] = coordY[0];
+				p[2] = coordX[0]; p[3] = coordY[0];
+				p[4] = coordX[0]; p[5] = coordY[0];
 				points.insert(points.end(), p.begin(), p.end());
 				lastPoint = p;
 				break;

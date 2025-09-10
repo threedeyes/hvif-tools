@@ -179,8 +179,10 @@ SVGParser::_ProcessPath(NSVGpath* path, ParseState& state)
 			hvifPath.nodes.push_back(startNode);
 		}
 
-		hvifPath.nodes.back().x_out = c1[0] * state.scale + state.tx;
-		hvifPath.nodes.back().y_out = c1[1] * state.scale + state.ty;
+		if (!hvifPath.nodes.empty()) {
+			hvifPath.nodes.back().x_out = c1[0] * state.scale + state.tx;
+			hvifPath.nodes.back().y_out = c1[1] * state.scale + state.ty;
+		}
 
 		hvif::PathNode endNode;
 		endNode.x = p1[0] * state.scale + state.tx;
@@ -189,13 +191,28 @@ SVGParser::_ProcessPath(NSVGpath* path, ParseState& state)
 		endNode.y_in = c2[1] * state.scale + state.ty;
 		endNode.x_out = endNode.x;
 		endNode.y_out = endNode.y;
+
 		hvifPath.nodes.push_back(endNode);
 	}
 
 	if (hvifPath.closed && hvifPath.nodes.size() > 1) {
-		float* last_segment_pts = &path->pts[(path->npts - 4) * 2];
-		hvifPath.nodes[0].x_in = last_segment_pts[4] * state.scale + state.tx;
-		hvifPath.nodes[0].y_in = last_segment_pts[5] * state.scale + state.ty;
+		if (path->npts >= 4) {
+			float* last_segment_pts = &path->pts[(path->npts - 4) * 2];
+			if (last_segment_pts + 5 < &path->pts[path->npts * 2]) {
+				hvifPath.nodes[0].x_in = last_segment_pts[4] * state.scale + state.tx;
+				hvifPath.nodes[0].y_in = last_segment_pts[5] * state.scale + state.ty;
+			}
+		}
+
+		if (hvifPath.nodes.size() > 1) {
+			const hvif::PathNode& firstNode = hvifPath.nodes[0];
+			hvif::PathNode& lastNode = hvifPath.nodes.back();
+			if (fabs(firstNode.x - lastNode.x) < 1e-3f && fabs(firstNode.y - lastNode.y) < 1e-3f) {
+				hvifPath.nodes[0].x_in = lastNode.x_in;
+				hvifPath.nodes[0].y_in = lastNode.y_in;
+				hvifPath.nodes.pop_back();
+			}
+		}
 	}
 
 	return state.writer->AddInternalPath(hvifPath);
