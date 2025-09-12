@@ -2,3 +2,6 @@
 	path = external/nanosvg
 	url = https://github.com/memononen/nanosvg.git
 	branch = master
+[submodule "external/stb"]
+	path = external/stb
+	url = https://github.com/nothings/stb
