@@ -76,14 +76,14 @@ ImageTracer::BitmapToTraceData(const BitmapData& bitmap, const TracingOptions& o
                                           options.fQuadraticThreshold);
     }
 
-    if (options.fDouglasPeuckerEnabled) {
-        PathSimplifier simplifier;
-        layers = simplifier.BatchLayerDouglasPeucker(layers, options);
-    }
-
     if (options.fFilterSmallObjects) {
         PathSimplifier simplifier;
         layers = simplifier.BatchFilterSmallObjects(layers, options);
+    }
+
+    if (options.fDouglasPeuckerEnabled) {
+        PathSimplifier simplifier;
+        layers = simplifier.BatchLayerDouglasPeucker(layers, options);
     }
 
     if (options.fCollinearTolerance > 0 ||
