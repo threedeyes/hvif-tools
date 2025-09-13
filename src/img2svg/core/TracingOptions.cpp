@@ -30,6 +30,11 @@ TracingOptions::SetDefaults()
 	fBlurRadius = 0.0f;
 	fBlurDelta = 20.0f;
 
+	fRemoveBackground = false;
+	fBackgroundMethod = BackgroundDetectionMethod::COMBINED;
+	fBackgroundTolerance = 10;
+	fMinBackgroundRatio = 0.3;
+
 	fDouglasPeuckerEnabled = false;
 	fDouglasPeuckerTolerance = 2.0f;
 	fDouglasPeuckerCurveProtection = 0.5f;

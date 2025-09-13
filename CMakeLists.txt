@@ -96,6 +96,7 @@ set(IMG2SVG_PROCESSING_SOURCES
     ${IMG2SVG_PROCESSING_DIR}/PathTracer.cpp
     ${IMG2SVG_PROCESSING_DIR}/PathSimplifier.cpp
     ${IMG2SVG_PROCESSING_DIR}/GeometryDetector.cpp
+    ${IMG2SVG_PROCESSING_DIR}/BackgroundRemover.cpp
 )
 
 # Output sources

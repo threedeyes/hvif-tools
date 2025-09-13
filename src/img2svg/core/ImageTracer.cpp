@@ -14,6 +14,7 @@
 #include "GeometryDetector.h"
 #include "SvgWriter.h"
 #include "SelectiveBlur.h"
+#include "BackgroundRemover.h"
 
 ImageTracer::ImageTracer()
 {
@@ -40,11 +41,22 @@ ImageTracer::BitmapToSvg(const BitmapData& bitmap, const TracingOptions& options
 IndexedBitmap
 ImageTracer::BitmapToTraceData(const BitmapData& bitmap, const TracingOptions& options)
 {
+    BitmapData processedBitmap = bitmap;
+
+    if (options.fRemoveBackground) {
+        BackgroundRemover remover;
+        remover.SetColorTolerance(options.fBackgroundTolerance);
+        remover.SetMinBackgroundRatio(options.fMinBackgroundRatio);
+        processedBitmap = remover.RemoveBackground(processedBitmap,
+												options.fBackgroundMethod,
+												options.fBackgroundTolerance);
+    }
+
     std::vector<std::vector<unsigned char>> palette =
-        _CreatePalette(bitmap, static_cast<int>(options.fNumberOfColors));
+        _CreatePalette(processedBitmap, static_cast<int>(options.fNumberOfColors));
 
     ColorQuantizer quantizer;
-    IndexedBitmap indexedBitmap = quantizer.QuantizeColors(bitmap, palette, options);
+    IndexedBitmap indexedBitmap = quantizer.QuantizeColors(processedBitmap, palette, options);
 
     PathScanner pathScanner;
     std::vector<std::vector<std::vector<int>>> rawLayers =

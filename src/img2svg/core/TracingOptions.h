@@ -6,6 +6,8 @@
 #ifndef TRACING_OPTIONS_H
 #define TRACING_OPTIONS_H
 
+#include "BackgroundRemover.h"
+
 class TracingOptions {
 public:
 							TracingOptions();
@@ -32,6 +34,12 @@ public:
 	// Preprocessing
 	float					fBlurRadius;
 	float					fBlurDelta;
+
+	// Background removal
+	bool					fRemoveBackground;
+	BackgroundDetectionMethod fBackgroundMethod;
+	int						fBackgroundTolerance;
+	double					fMinBackgroundRatio;
 
 	// Douglas-Peucker simplification
 	bool					fDouglasPeuckerEnabled;

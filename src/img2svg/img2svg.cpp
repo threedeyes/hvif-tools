@@ -35,6 +35,13 @@ PrintUsage(const char* programName)
 	std::cout << "  --blurradius <value>         Blur radius (default: " << defaults.fBlurRadius << ")\n";
 	std::cout << "\n";
 
+	std::cout << "Background removal:\n";
+	std::cout << "  --remove_bg <value>          Remove background (0=off, 1=on, default: " << static_cast<int>(defaults.fRemoveBackground) << ")\n";
+	std::cout << "  --bg_method <value>          Background detection method (0=edge, 1=flood, 2=dominant, 3=clustering, 4=combined, default: 4)\n";
+	std::cout << "  --bg_tolerance <value>       Background color tolerance (default: " << defaults.fBackgroundTolerance << ")\n";
+	std::cout << "  --bg_ratio <value>           Minimum background ratio (default: " << defaults.fMinBackgroundRatio << ")\n";
+	std::cout << "\n";
+
 	std::cout << "Path simplification:\n";
 	std::cout << "  --aggressive_simplify <value> Aggressive path simplification (0=off, 1=on, default: " << static_cast<int>(defaults.fAggressiveSimplification) << ")\n";
 	std::cout << "  --collinear_tolerance <value> Tolerance for merging collinear segments (default: " << defaults.fCollinearTolerance << ")\n";
@@ -83,8 +90,9 @@ PrintUsage(const char* programName)
 	std::cout << "\n";
 	std::cout << "Examples:\n";
 	std::cout << "  " << programName << " input.png output.svg\n";
-	std::cout << "  " << programName << " input.jpg output.svg -colors 16 -scale 2\n";
-	std::cout << "  " << programName << " input.png output.svg -douglas 1 -optimize_svg 1\n";
+	std::cout << "  " << programName << " input.jpg output.svg --colors 16 --scale 2\n";
+	std::cout << "  " << programName << " input.png output.svg --douglas 1 --optimize_svg 1\n";
+	std::cout << "  " << programName << " input.png output.svg --remove_bg 1 --bg_method 4 --bg_tolerance 15\n";
 }
 
 float
@@ -165,6 +173,15 @@ main(int argc, char* argv[])
 				options.fBlurRadius = ParseFloat(argv[++i]);
 			} else if (strcmp(argv[i], "--blurdelta") == 0) {
 				options.fBlurDelta = ParseFloat(argv[++i]);
+			} else if (strcmp(argv[i], "--remove_bg") == 0) {
+				options.fRemoveBackground = ParseFloat(argv[++i]) > 0.5f;
+			} else if (strcmp(argv[i], "--bg_method") == 0) {
+				int method = static_cast<int>(ParseFloat(argv[++i]));
+				options.fBackgroundMethod = static_cast<BackgroundDetectionMethod>(method);
+			} else if (strcmp(argv[i], "--bg_tolerance") == 0) {
+				options.fBackgroundTolerance = static_cast<int>(ParseFloat(argv[++i]));
+			} else if (strcmp(argv[i], "--bg_ratio") == 0) {
+				options.fMinBackgroundRatio = ParseFloat(argv[++i]);
 			} else if (strcmp(argv[i], "--douglas") == 0) {
 				options.fDouglasPeuckerEnabled = ParseFloat(argv[++i]) > 0.5f;
 			} else if (strcmp(argv[i], "--douglas_tolerance") == 0) {
@@ -228,6 +245,9 @@ main(int argc, char* argv[])
 		}
 
 		std::cout << "Conversion completed successfully!" << std::endl;
+		if (options.fRemoveBackground) {
+			std::cout << "Background removal applied using method " << static_cast<int>(options.fBackgroundMethod) << std::endl;
+		}
 
 	} catch (const std::exception& e) {
 		std::cerr << "Error: " << e.what() << std::endl;
