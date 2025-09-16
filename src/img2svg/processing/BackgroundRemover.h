@@ -43,6 +43,12 @@ struct BackgroundCandidate {
 	BackgroundCandidate() : frequency(0), edgeScore(0.0), connectivityScore(0.0) {}
 };
 
+struct ColorFrequencyComparator {
+	bool operator()(const std::pair<ColorKey, int>& a, const std::pair<ColorKey, int>& b) const {
+		return a.second > b.second;
+	}
+};
+
 class BackgroundRemover {
 public:
 	BackgroundRemover();
@@ -80,15 +86,15 @@ private:
 
 	std::vector<BackgroundCandidate> ClusterSimilarColors(const std::map<ColorKey, int>& histogram, int tolerance) const;
 
+	ColorKey GetPixelColor(const BitmapData& bitmap, int x, int y) const;
+	void FloodFillMark(const BitmapData& bitmap, int startX, int startY,
+					const ColorKey& targetColor, int tolerance,
+					std::vector<std::vector<bool> >& visited,
+					std::vector<std::vector<bool> >& toRemove) const;
+
 	int fColorTolerance;
 	double fMinBackgroundRatio;
 	double fEdgeWeight;
-};
-
-struct ColorFrequencyComparator {
-	bool operator()(const std::pair<ColorKey, int>& a, const std::pair<ColorKey, int>& b) const {
-		return a.second > b.second;
-	}
 };
 
 #endif // BACKGROUND_REMOVER_H

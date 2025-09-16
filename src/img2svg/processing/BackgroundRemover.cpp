@@ -397,16 +397,44 @@ BackgroundRemover::ApplyBackgroundRemoval(const BitmapData& bitmap, const ColorK
 	int height = bitmap.Height();
 	std::vector<unsigned char> newData = bitmap.Data();
 
+	std::vector<std::vector<bool> > visited(height, std::vector<bool>(width, false));
+	std::vector<std::vector<bool> > toRemove(height, std::vector<bool>(width, false));
+
+	for (int x = 0; x < width; x++) {
+		if (!visited[0][x]) {
+			ColorKey color = GetPixelColor(bitmap, x, 0);
+			if (ColorsMatch(color, backgroundColor, tolerance)) {
+				FloodFillMark(bitmap, x, 0, backgroundColor, tolerance, visited, toRemove);
+			}
+		}
+
+		if (!visited[height-1][x]) {
+			ColorKey color = GetPixelColor(bitmap, x, height-1);
+			if (ColorsMatch(color, backgroundColor, tolerance)) {
+				FloodFillMark(bitmap, x, height-1, backgroundColor, tolerance, visited, toRemove);
+			}
+		}
+	}
+
+	for (int y = 1; y < height-1; y++) {
+		if (!visited[y][0]) {
+			ColorKey color = GetPixelColor(bitmap, 0, y);
+			if (ColorsMatch(color, backgroundColor, tolerance)) {
+				FloodFillMark(bitmap, 0, y, backgroundColor, tolerance, visited, toRemove);
+			}
+		}
+
+		if (!visited[y][width-1]) {
+			ColorKey color = GetPixelColor(bitmap, width-1, y);
+			if (ColorsMatch(color, backgroundColor, tolerance)) {
+				FloodFillMark(bitmap, width-1, y, backgroundColor, tolerance, visited, toRemove);
+			}
+		}
+	}
+
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
-			ColorKey currentColor = {
-				bitmap.GetPixelComponent(x, y, 0),
-				bitmap.GetPixelComponent(x, y, 1),
-				bitmap.GetPixelComponent(x, y, 2),
-				bitmap.GetPixelComponent(x, y, 3)
-			};
-
-			if (ColorsMatch(currentColor, backgroundColor, tolerance)) {				
+			if (toRemove[y][x]) {
 				int index = (y * width + x) * 4;
 				newData[index + 3] = 0; // Set transparent pixel
 			}
@@ -472,4 +500,52 @@ BackgroundRemover::ClusterSimilarColors(const std::map<ColorKey, int>& histogram
 	}
 
 	return clusters;
+}
+
+ColorKey
+BackgroundRemover::GetPixelColor(const BitmapData& bitmap, int x, int y) const
+{
+	ColorKey color = {
+		bitmap.GetPixelComponent(x, y, 0),
+		bitmap.GetPixelComponent(x, y, 1),
+		bitmap.GetPixelComponent(x, y, 2),
+		bitmap.GetPixelComponent(x, y, 3)
+	};
+	return color;
+}
+
+void
+BackgroundRemover::FloodFillMark(const BitmapData& bitmap, int startX, int startY,
+								const ColorKey& targetColor, int tolerance,
+								std::vector<std::vector<bool> >& visited,
+								std::vector<std::vector<bool> >& toRemove) const
+{
+	int width = bitmap.Width();
+	int height = bitmap.Height();
+
+	std::queue<std::pair<int, int> > queue;
+	queue.push(std::make_pair(startX, startY));
+
+	while (!queue.empty()) {
+		std::pair<int, int> point = queue.front();
+		queue.pop();
+		int x = point.first;
+		int y = point.second;
+
+		if (x < 0 || x >= width || y < 0 || y >= height || visited[y][x])
+			continue;
+
+		ColorKey currentColor = GetPixelColor(bitmap, x, y);
+
+		if (!ColorsMatch(currentColor, targetColor, tolerance))
+			continue;
+
+		visited[y][x] = true;
+		toRemove[y][x] = true;
+
+		queue.push(std::make_pair(x+1, y));
+		queue.push(std::make_pair(x-1, y));
+		queue.push(std::make_pair(x, y+1));
+		queue.push(std::make_pair(x, y-1));
+	}
 }
