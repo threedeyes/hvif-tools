@@ -117,15 +117,15 @@ ImageTracer::SaveSvg(const std::string& filename, const std::string& svgData)
 std::vector<std::vector<unsigned char>>
 ImageTracer::_CreatePalette(const BitmapData& bitmap, int colorCount)
 {
-	std::vector<std::vector<int>> pixels(bitmap.Width());
-	for (int i = 0; i < bitmap.Width(); i++) {
-		pixels[i].resize(bitmap.Height());
-		for (int j = 0; j < bitmap.Height(); j++) {
-			int red   = bitmap.GetPixelComponent(i, j, 0);
-			int green = bitmap.GetPixelComponent(i, j, 1);
-			int blue  = bitmap.GetPixelComponent(i, j, 2);
-			int alpha = bitmap.GetPixelComponent(i, j, 3);
-			pixels[i][j] = (alpha << 24) | (red << 16) | (green << 8) | blue;
+	std::vector<std::vector<int>> pixels(bitmap.Height());
+	for (int y = 0; y < bitmap.Height(); y++) {
+		pixels[y].resize(bitmap.Width());
+		for (int x = 0; x < bitmap.Width(); x++) {
+			int red   = bitmap.GetPixelComponent(x, y, 0);
+			int green = bitmap.GetPixelComponent(x, y, 1);
+			int blue  = bitmap.GetPixelComponent(x, y, 2);
+			int alpha = bitmap.GetPixelComponent(x, y, 3);
+			pixels[y][x] = (alpha << 24) | (red << 16) | (green << 8) | blue;
 		}
 	}
 
@@ -134,28 +134,34 @@ ImageTracer::_CreatePalette(const BitmapData& bitmap, int colorCount)
 	std::vector<std::vector<unsigned char>> bytePalette;
 
 	bool hasTransparency = false;
-	for (int i = 0; i < bitmap.Width() * bitmap.Height(); i++) {
-		if (bitmap.Data()[i * 4 + 3] == 0) {
-			hasTransparency = true;
-			break;
+	for (int y = 0; y < bitmap.Height() && !hasTransparency; y++) {
+		for (int x = 0; x < bitmap.Width(); x++) {
+			if (bitmap.GetPixelComponent(x, y, 3) == 0) {
+				hasTransparency = true;
+				break;
+			}
 		}
 	}
 
 	if (hasTransparency) {
 		std::vector<unsigned char> transparentColor(4);
-		transparentColor[0] = 0;
-		transparentColor[1] = 0;
-		transparentColor[2] = 0;
-		transparentColor[3] = 0;
+		transparentColor[0] = 0;  // R
+		transparentColor[1] = 0;  // G
+		transparentColor[2] = 0;  // B
+		transparentColor[3] = 0;  // A
 		bytePalette.push_back(transparentColor);
 	}
 
 	for (int i = 0; i < static_cast<int>(palette.size()); i++) {
 		std::vector<unsigned char> color(4);
-		color[0] = (palette[i] >> 16) & 0xFF;
-		color[1] = (palette[i] >> 8) & 0xFF;
-		color[2] = palette[i] & 0xFF;
-		color[3] = (palette[i] >> 24) & 0xFF;
+		color[0] = (palette[i] >> 16) & 0xFF;  // R
+		color[1] = (palette[i] >> 8) & 0xFF;   // G
+		color[2] = palette[i] & 0xFF;          // B
+		color[3] = (palette[i] >> 24) & 0xFF;  // A
+
+		if (hasTransparency && color[3] == 0)
+			continue;
+
 		bytePalette.push_back(color);
 	}
 
