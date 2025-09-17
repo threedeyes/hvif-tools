@@ -70,6 +70,7 @@ PrintUsage(const char* programName)
 
 	std::cout << "SVG output\n";
 	std::cout << "  --desc <value>               Add description (0=off, 1=on, default: " << static_cast<int>(defaults.fShowDescription) << ")\n";
+	std::cout << "  --description <text>         Custom description text (default: \"Created with img2svg version 1.0\")\n";
 	std::cout << "  --roundcoords <value>        Round coordinates precision (-1=auto, default: " << defaults.fRoundCoordinates << ")\n";
 	std::cout << "  --scale <value>              Scale factor (default: " << defaults.fScale << ")\n";
 	std::cout << "  --viewbox <value>            Use viewbox instead of width/height (0=off, 1=on, default: " << static_cast<int>(defaults.fUseViewBox) << ")\n";
@@ -167,6 +168,8 @@ main(int argc, char* argv[])
 				options.fQuadraticControlPointRadius = ParseFloat(argv[++i]);
 			} else if (strcmp(argv[i], "--desc") == 0) {
 				options.fShowDescription = ParseFloat(argv[++i]) > 0.5f;
+			} else if (strcmp(argv[i], "--description") == 0) {
+				options.fCustomDescription = std::string(argv[++i]);
 			} else if (strcmp(argv[i], "--viewbox") == 0) {
 				options.fUseViewBox = ParseFloat(argv[++i]) > 0.5f;
 			} else if (strcmp(argv[i], "--blurradius") == 0) {

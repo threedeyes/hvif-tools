@@ -122,7 +122,9 @@ SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions&
 	svgStream << " version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\"";
 
 	if (options.fShowDescription) {
-		svgStream << "\n  desc=\"Created with ImageTracer C++ version 1.0\"";
+		std::string description = options.fCustomDescription.empty() ?
+			"Created with img2svg version 1.0" : options.fCustomDescription;
+		svgStream << "\n  desc=\"" << description << "\"";
 	}
 	svgStream << ">";
 

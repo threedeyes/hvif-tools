@@ -6,6 +6,7 @@
 #ifndef TRACING_OPTIONS_H
 #define TRACING_OPTIONS_H
 
+#include <string>
 #include "BackgroundRemover.h"
 
 class TracingOptions {
@@ -29,6 +30,7 @@ public:
 	float					fLineControlPointRadius;
 	float					fQuadraticControlPointRadius;
 	bool					fShowDescription;
+	std::string				fCustomDescription;
 	bool					fUseViewBox;
 
 	// Preprocessing
