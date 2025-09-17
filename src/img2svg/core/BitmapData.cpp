@@ -16,6 +16,9 @@ BitmapData::BitmapData(int width, int height, const std::vector<unsigned char>& 
 	, fHeight(height)
 	, fData(data)
 {
+	if (fData.size() != static_cast<size_t>(fWidth * fHeight * 4)) {
+		fData.resize(fWidth * fHeight * 4, 0);
+	}
 }
 
 bool
@@ -32,6 +35,9 @@ BitmapData::GetPixelComponent(int x, int y, int component) const
 		return 0;
 
 	int index = (y * fWidth + x) * 4 + component;
+	if (index >= static_cast<int>(fData.size()))
+		return 0;
+
 	return fData[index];
 }
 
@@ -42,5 +48,8 @@ BitmapData::SetPixelComponent(int x, int y, int component, unsigned char value)
 		return;
 
 	int index = (y * fWidth + x) * 4 + component;
+	if (index >= static_cast<int>(fData.size()))
+		return;
+
 	fData[index] = value;
 }
