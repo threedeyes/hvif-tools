@@ -15,6 +15,7 @@
 #include "SvgWriter.h"
 #include "SelectiveBlur.h"
 #include "BackgroundRemover.h"
+#include "VisvalingamWhyatt.h"
 
 ImageTracer::ImageTracer()
 {
@@ -67,6 +68,11 @@ ImageTracer::BitmapToTraceData(const BitmapData& bitmap, const TracingOptions& o
 
     std::vector<std::vector<std::vector<std::vector<double>>>> batchInternodes =
         pathScanner.CreateInternodes(batchPaths);
+
+    if (options.fVisvalingamWhyattEnabled) {
+        VisvalingamWhyatt vw;
+        batchInternodes = vw.BatchSimplifyLayerInternodes(batchInternodes, options.fVisvalingamWhyattTolerance);
+    }
 
     PathTracer tracer;
     std::vector<std::vector<std::vector<std::vector<double>>>> layers(batchInternodes.size());

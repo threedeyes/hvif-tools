@@ -71,6 +71,10 @@ public:
 	float					fMinObjectWidth;
 	float					fMinObjectHeight;
 	float					fMinObjectPerimeter;
+
+	// Visvalingam-Whyatt simplification
+	bool					fVisvalingamWhyattEnabled;
+	float					fVisvalingamWhyattTolerance;
 };
 
 #endif // TRACING_OPTIONS_H

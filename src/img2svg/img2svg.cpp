@@ -52,6 +52,11 @@ PrintUsage(const char* programName)
 	std::cout << "  --min_segment_length <value> Minimum segment length to keep (default: " << defaults.fMinSegmentLength << ")\n";
 	std::cout << "\n";
 
+	std::cout << "Visvalingam-Whyatt simplification:\n";
+	std::cout << "  --vw_enable <value>          Enable Visvalingam-Whyatt (0=off, 1=on, default: " << static_cast<int>(defaults.fVisvalingamWhyattEnabled) << ")\n";
+	std::cout << "  --vw_tolerance <value>       Area tolerance for VW algorithm (default: " << defaults.fVisvalingamWhyattTolerance << ")\n";
+	std::cout << "\n";
+
 	std::cout << "Geometry detection:\n";
 	std::cout << "  --circle_tolerance <value>   Circle detection tolerance (default: " << defaults.fCircleTolerance << ")\n";
 	std::cout << "  --detect_geometry <value>    Enable geometry detection (0=off, 1=on, default: " << static_cast<int>(defaults.fDetectGeometry) << ")\n";
@@ -94,6 +99,7 @@ PrintUsage(const char* programName)
 	std::cout << "  " << programName << " input.jpg output.svg --colors 16 --scale 2\n";
 	std::cout << "  " << programName << " input.png output.svg --douglas 1 --optimize_svg 1\n";
 	std::cout << "  " << programName << " input.png output.svg --remove_bg 1 --bg_method 4 --bg_tolerance 15\n";
+	std::cout << "  " << programName << " input.png output.svg --vw_enable 1 --vw_tolerance 1.5\n";
 }
 
 float
@@ -223,6 +229,10 @@ main(int argc, char* argv[])
 				options.fMinObjectHeight = ParseFloat(argv[++i]);
 			} else if (strcmp(argv[i], "--min_perimeter") == 0) {
 				options.fMinObjectPerimeter = ParseFloat(argv[++i]);
+			} else if (strcmp(argv[i], "--vw_enable") == 0) {
+				options.fVisvalingamWhyattEnabled = ParseFloat(argv[++i]) > 0.5f;
+			} else if (strcmp(argv[i], "--vw_tolerance") == 0) {
+				options.fVisvalingamWhyattTolerance = ParseFloat(argv[++i]);
 			} else {
 				std::cerr << "Warning: Unknown option: " << argv[i] << std::endl;
 				i++;
@@ -250,6 +260,9 @@ main(int argc, char* argv[])
 		std::cout << "Conversion completed successfully!" << std::endl;
 		if (options.fRemoveBackground) {
 			std::cout << "Background removal applied using method " << static_cast<int>(options.fBackgroundMethod) << std::endl;
+		}
+		if (options.fVisvalingamWhyattEnabled) {
+			std::cout << "Visvalingam-Whyatt simplification applied with tolerance " << options.fVisvalingamWhyattTolerance << std::endl;
 		}
 
 	} catch (const std::exception& e) {

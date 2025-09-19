@@ -59,4 +59,7 @@ TracingOptions::SetDefaults()
 	fMinObjectWidth = 3.0f;
 	fMinObjectHeight = 3.0f;
 	fMinObjectPerimeter = 12.0f;
+
+	fVisvalingamWhyattEnabled = false;
+	fVisvalingamWhyattTolerance = 1.0f;
 }
