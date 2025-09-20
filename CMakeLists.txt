@@ -19,7 +19,7 @@ set(PROJECT_ROOT ${CMAKE_CURRENT_SOURCE_DIR})
 set(SRC_DIR       ${PROJECT_ROOT}/src)
 set(EXTERNAL_DIR  ${PROJECT_ROOT}/external)
 
-set(NANOSVG_DIR ${EXTERNAL_DIR}/nanosvg/src)
+set(NANOSVG_DIR ${EXTERNAL_DIR}/nanosvg_ext/src)
 if(NOT EXISTS "${NANOSVG_DIR}/nanosvg.h")
   message(WARNING "nanosvg.h not found in ${NANOSVG_DIR}. Place nanosvg.h there or update NANOSVG_DIR.")
 endif()
