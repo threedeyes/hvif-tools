@@ -17,8 +17,11 @@ IndexedBitmap::IndexedBitmap(const std::vector<std::vector<int>>& indexArray,
 	, fPalette(palette)
 {
 	if (!indexArray.empty() && !indexArray[0].empty()) {
-		fWidth = indexArray[0].size() - 2;
-		fHeight = indexArray.size() - 2;
+		fWidth = (int)indexArray[0].size() - 2;
+		fHeight = (int)indexArray.size() - 2;
+	} else {
+		fWidth = 0;
+		fHeight = 0;
 	}
 }
 
@@ -26,4 +29,5 @@ void
 IndexedBitmap::SetLayers(const std::vector<std::vector<std::vector<std::vector<double>>>>& layers)
 {
 	fLayers = layers;
+	// TODO: Keep existing gradients unless explicitly overwritten by SetLinearGradients() ???
 }

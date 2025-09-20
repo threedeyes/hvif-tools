@@ -16,6 +16,7 @@
 #include "SelectiveBlur.h"
 #include "BackgroundRemover.h"
 #include "VisvalingamWhyatt.h"
+#include "GradientDetector.h"
 
 ImageTracer::ImageTracer()
 {
@@ -105,6 +106,14 @@ ImageTracer::BitmapToTraceData(const BitmapData& bitmap, const TracingOptions& o
     }
 
     indexedBitmap.SetLayers(layers);
+
+    if (options.fDetectGradients) {
+        GradientDetector grad;
+        std::vector<std::vector<IndexedBitmap::LinearGradient> > grads =
+            grad.DetectLinearGradients(indexedBitmap, processedBitmap, layers, options);
+        indexedBitmap.SetLinearGradients(grads);
+    }
+
     return indexedBitmap;
 }
 

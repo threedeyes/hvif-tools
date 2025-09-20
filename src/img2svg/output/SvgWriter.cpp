@@ -3,8 +3,12 @@
  * Distributed under the terms of the MIT License.
  */
 
-#include <cmath>
+#include <vector>
+#include <string>
+#include <sstream>
 #include <iomanip>
+#include <algorithm>
+#include <cmath>
 #include <map>
 #include <set>
 
@@ -18,6 +22,49 @@ SvgWriter::~SvgWriter()
 {
 }
 
+std::string
+SvgWriter::_HexColor(unsigned char r, unsigned char g, unsigned char b)
+{
+	static const char* hexdig = "0123456789ABCDEF";
+	char buf[8];
+	buf[0] = '#';
+	buf[1] = hexdig[(r >> 4) & 0xF];
+	buf[2] = hexdig[(r     ) & 0xF];
+	buf[3] = hexdig[(g >> 4) & 0xF];
+	buf[4] = hexdig[(g     ) & 0xF];
+	buf[5] = hexdig[(b >> 4) & 0xF];
+	buf[6] = hexdig[(b     ) & 0xF];
+	buf[7] = '\0';
+	return std::string(buf);
+}
+
+std::string
+SvgWriter::_ColorToSvgString(const std::vector<unsigned char>& color)
+{
+	std::ostringstream stream;
+	stream << std::hex << std::setfill('0');
+	stream << "#" << std::setw(2) << static_cast<int>(color[0]) 
+		   << std::setw(2) << static_cast<int>(color[1]) 
+		   << std::setw(2) << static_cast<int>(color[2]);
+
+	std::string hexColor = stream.str();
+	std::ostringstream result;
+
+	double opacity = static_cast<double>(color[3]) / 255.0;
+
+	if (opacity < 0.01) {
+		result << "fill=\"none\" stroke=\"none\" ";
+	} else if (opacity < 0.99) {
+		result << "fill=\"" << hexColor << "\" stroke=\"" << hexColor
+			   << "\" stroke-width=\"1\" opacity=\"" << opacity << "\" ";
+	} else {
+		result << "fill=\"" << hexColor << "\" stroke=\"" << hexColor
+			   << "\" stroke-width=\"1\" ";
+	}
+
+	return result.str();
+}
+
 float
 SvgWriter::_RoundToDecimal(float value, float places)
 {
@@ -25,16 +72,22 @@ SvgWriter::_RoundToDecimal(float value, float places)
 }
 
 void
-SvgWriter::_WriteSvgPathString(std::ostringstream& stream, const std::string& description,
-							const std::vector<std::vector<double>>& segments,
-							const std::string& colorString, const TracingOptions& options)
+SvgWriter::_WriteSvgPathString(std::ostringstream& stream,
+								const std::string& description,
+								const std::vector<std::vector<double>>& segments,
+								const std::string& fillPaint,
+								float fillOpacity,
+								const TracingOptions& options)
 {
+	if (segments.empty())
+		return;
+
 	float scale = options.fScale;
 	float lineControlPointRadius = options.fLineControlPointRadius;
 	float quadraticControlPointRadius = options.fQuadraticControlPointRadius;
 	float roundCoordinates = floor(options.fRoundCoordinates);
 
-	stream << "\n  <path " << description << colorString << "d=\"";
+	stream << "\n  <path " << description << fillPaint << "d=\"";
 	stream << "M " << segments[0][1] * scale << " " << segments[0][2] * scale;
 
 	if (roundCoordinates == -1) {
@@ -101,6 +154,27 @@ SvgWriter::_WriteSvgPathString(std::ostringstream& stream, const std::string& de
 	}
 }
 
+void
+SvgWriter::_WriteLinearGradientDef(std::ostringstream& defs,
+								   const IndexedBitmap::LinearGradient& g,
+								   const std::string& id)
+{
+	std::string c1 = _HexColor(g.c1[0], g.c1[1], g.c1[2]);
+	std::string c2 = _HexColor(g.c2[0], g.c2[1], g.c2[2]);
+	double o1 = (double)g.c1[3] / 255.0;
+	double o2 = (double)g.c2[3] / 255.0;
+
+	defs << "<linearGradient id=\"" << id << "\" gradientUnits=\"userSpaceOnUse\" "
+		 << "x1=\"" << g.x1 << "\" y1=\"" << g.y1 << "\" x2=\"" << g.x2 << "\" y2=\"" << g.y2 << "\">";
+	defs << "<stop offset=\"0%\" stop-color=\"" << c1 << "\"";
+	if (o1 < 0.999) defs << " stop-opacity=\"" << _RoundToDecimal((float)o1, 3.0f) << "\"";
+	defs << "/>";
+	defs << "<stop offset=\"100%\" stop-color=\"" << c2 << "\"";
+	if (o2 < 0.999) defs << " stop-opacity=\"" << _RoundToDecimal((float)o2, 3.0f) << "\"";
+	defs << "/>";
+	defs << "</linearGradient>";
+}
+
 std::string
 SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions& options)
 {
@@ -128,6 +202,35 @@ SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions&
 	}
 	svgStream << ">";
 
+	// Collect gradients
+	const std::vector<std::vector<IndexedBitmap::LinearGradient>>& grads = indexedBitmap.LinearGradients();
+	bool hasGradients = false;
+	for (size_t k = 0; k < grads.size(); k++) {
+		for (size_t i = 0; i < grads[k].size(); i++) {
+			if (grads[k][i].valid) { hasGradients = true; break; }
+		}
+		if (hasGradients) break;
+	}
+
+	// defs with gradients
+	if (hasGradients) {
+		std::ostringstream defs;
+		defs << "\n<defs>";
+		for (size_t k = 0; k < grads.size(); k++) {
+			for (size_t i = 0; i < grads[k].size(); i++) {
+				if (grads[k][i].valid) {
+					std::ostringstream id;
+					id << "lg_" << k << "_" << i;
+					defs << "\n";
+					_WriteLinearGradientDef(defs, grads[k][i], id.str());
+				}
+			}
+		}
+		defs << "\n</defs>";
+		svgStream << defs.str();
+	}
+
+	// Create Z-index map like in the original
 	std::map<double, std::pair<int, int>> zIndexMap;
 	double label;
 
@@ -164,57 +267,21 @@ SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions&
 			description = "";
 		}
 
+		// Check for gradient override
+		std::string colorString = _ColorToSvgString(indexedBitmap.Palette()[layer]);
+		if (layer < static_cast<int>(grads.size()) && path < static_cast<int>(grads[layer].size()) && grads[layer][path].valid) {
+			// Use gradient instead of solid color
+			std::ostringstream gradientFill;
+			gradientFill << "fill=\"url(#lg_" << layer << "_" << path << ")\" ";
+			colorString = gradientFill.str();
+		}
+
 		_WriteSvgPathString(svgStream, description, indexedBitmap.Layers()[layer][path],
-						   _ColorToSvgString(indexedBitmap.Palette()[layer]), options);
+						   colorString, 1.0f, options);
 	}
 
 	svgStream << "\n</svg>\n";
 	return svgStream.str();
-}
-
-std::string
-SvgWriter::_ColorToSvgString(const std::vector<unsigned char>& color)
-{
-	std::ostringstream stream;
-	stream << std::hex << std::setfill('0');
-	stream << "#" << std::setw(2) << static_cast<int>(color[0]) 
-		   << std::setw(2) << static_cast<int>(color[1]) 
-		   << std::setw(2) << static_cast<int>(color[2]);
-
-	std::string hexColor = stream.str();
-	std::ostringstream result;
-
-	double opacity = static_cast<double>(color[3]) / 255.0;
-
-	if (opacity < 0.01) {
-		result << "fill=\"none\" stroke=\"none\" ";
-	} else if (opacity < 0.99) {
-		result << "fill=\"" << hexColor << "\" stroke=\"" << hexColor
-			   << "\" stroke-width=\"1\" opacity=\"" << opacity << "\" ";
-	} else {
-		result << "fill=\"" << hexColor << "\" stroke=\"" << hexColor
-			   << "\" stroke-width=\"1\" ";
-	}
-
-	return result.str();
-}
-
-std::string
-SvgWriter::OptimizeSvgString(const std::string& svgString, const TracingOptions& options)
-{
-	if (!options.fOptimizeSvg) {
-		return svgString;
-	}
-
-	std::string optimized = svgString;
-
-	if (options.fRemoveDuplicates) {
-		optimized = _RemoveDuplicatePaths(optimized);
-	}
-
-	optimized = _CompactSvgCommands(optimized);
-
-	return optimized;
 }
 
 std::string
@@ -263,4 +330,22 @@ SvgWriter::_CompactSvgCommands(const std::string& svgString)
 	}
 
 	return result;
+}
+
+std::string
+SvgWriter::OptimizeSvgString(const std::string& svgString, const TracingOptions& options)
+{
+	if (!options.fOptimizeSvg) {
+		return svgString;
+	}
+
+	std::string optimized = svgString;
+
+	if (options.fRemoveDuplicates) {
+		optimized = _RemoveDuplicatePaths(optimized);
+	}
+
+	optimized = _CompactSvgCommands(optimized);
+
+	return optimized;
 }

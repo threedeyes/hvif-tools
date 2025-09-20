@@ -26,8 +26,8 @@ PrintUsage(const char* programName)
 	std::cout << "\n";
 
 	std::cout << "Color quantization:\n";
-	std::cout << "  --colors <value>             Number of colors (default: " << static_cast<int>(defaults.fNumberOfColors) << ")\n";
-	std::cout << "  --colorquantcycles <value>   Color quantization cycles (default: " << static_cast<int>(defaults.fColorQuantizationCycles) << ")\n";
+	std::cout << "  --colors <value>             Number of colors (default: " << (int)defaults.fNumberOfColors << ")\n";
+	std::cout << "  --colorquantcycles <value>   Color quantization cycles (default: " << (int)defaults.fColorQuantizationCycles << ")\n";
 	std::cout << "\n";
 
 	std::cout << "Preprocessing:\n";
@@ -36,37 +36,37 @@ PrintUsage(const char* programName)
 	std::cout << "\n";
 
 	std::cout << "Background removal:\n";
-	std::cout << "  --remove_bg <value>          Remove background (0=off, 1=on, default: " << static_cast<int>(defaults.fRemoveBackground) << ")\n";
+	std::cout << "  --remove_bg <value>          Remove background (0=off, 1=on, default: " << (int)defaults.fRemoveBackground << ")\n";
 	std::cout << "  --bg_method <value>          Background detection method (0=edge, 1=flood, 2=dominant, 3=clustering, 4=combined, default: 4)\n";
 	std::cout << "  --bg_tolerance <value>       Background color tolerance (default: " << defaults.fBackgroundTolerance << ")\n";
 	std::cout << "  --bg_ratio <value>           Minimum background ratio (default: " << defaults.fMinBackgroundRatio << ")\n";
 	std::cout << "\n";
 
 	std::cout << "Path simplification:\n";
-	std::cout << "  --aggressive_simplify <value> Aggressive path simplification (0=off, 1=on, default: " << static_cast<int>(defaults.fAggressiveSimplification) << ")\n";
+	std::cout << "  --aggressive_simplify <value> Aggressive path simplification (0=off, 1=on, default: " << (int)defaults.fAggressiveSimplification << ")\n";
 	std::cout << "  --collinear_tolerance <value> Tolerance for merging collinear segments (default: " << defaults.fCollinearTolerance << ")\n";
 	std::cout << "  --curve_smoothing <value>     Additional curve smoothing factor (default: " << defaults.fCurveSmoothing << ")\n";
-	std::cout << "  --douglas <value>            Enable Douglas-Peucker (0=off, 1=on, default: " << static_cast<int>(defaults.fDouglasPeuckerEnabled) << ")\n";
+	std::cout << "  --douglas <value>            Enable Douglas-Peucker (0=off, 1=on, default: " << (int)defaults.fDouglasPeuckerEnabled << ")\n";
 	std::cout << "  --douglas_curves <value>     Protect curves in Douglas-Peucker (0=off, 1=on, default: " << defaults.fDouglasPeuckerCurveProtection << ")\n";
 	std::cout << "  --douglas_tolerance <value>  Douglas-Peucker tolerance (default: " << defaults.fDouglasPeuckerTolerance << ")\n";
 	std::cout << "  --min_segment_length <value> Minimum segment length to keep (default: " << defaults.fMinSegmentLength << ")\n";
 	std::cout << "\n";
 
 	std::cout << "Visvalingam-Whyatt simplification:\n";
-	std::cout << "  --vw_enable <value>          Enable Visvalingam-Whyatt (0=off, 1=on, default: " << static_cast<int>(defaults.fVisvalingamWhyattEnabled) << ")\n";
+	std::cout << "  --vw_enable <value>          Enable Visvalingam-Whyatt (0=off, 1=on, default: " << (int)defaults.fVisvalingamWhyattEnabled << ")\n";
 	std::cout << "  --vw_tolerance <value>       Area tolerance for VW algorithm (default: " << defaults.fVisvalingamWhyattTolerance << ")\n";
 	std::cout << "\n";
 
 	std::cout << "Geometry detection:\n";
 	std::cout << "  --circle_tolerance <value>   Circle detection tolerance (default: " << defaults.fCircleTolerance << ")\n";
-	std::cout << "  --detect_geometry <value>    Enable geometry detection (0=off, 1=on, default: " << static_cast<int>(defaults.fDetectGeometry) << ")\n";
+	std::cout << "  --detect_geometry <value>    Enable geometry detection (0=off, 1=on, default: " << (int)defaults.fDetectGeometry << ")\n";
 	std::cout << "  --line_tolerance <value>     Line detection tolerance (default: " << defaults.fLineTolerance << ")\n";
 	std::cout << "  --max_circle_radius <value>  Maximum circle radius (default: " << defaults.fMaxCircleRadius << ")\n";
 	std::cout << "  --min_circle_radius <value>  Minimum circle radius (default: " << defaults.fMinCircleRadius << ")\n";
 	std::cout << "\n";
 
 	std::cout << "Filtering:\n";
-	std::cout << "  --filter_small <value>       Enable small object filtering (0=off, 1=on, default: " << static_cast<int>(defaults.fFilterSmallObjects) << ")\n";
+	std::cout << "  --filter_small <value>       Enable small object filtering (0=off, 1=on, default: " << (int)defaults.fFilterSmallObjects << ")\n";
 	std::cout << "  --min_area <value>           Minimum object area in pixels (default: " << defaults.fMinObjectArea << ")\n";
 	std::cout << "  --min_height <value>         Minimum object height in pixels (default: " << defaults.fMinObjectHeight << ")\n";
 	std::cout << "  --min_perimeter <value>      Minimum object perimeter in pixels (default: " << defaults.fMinObjectPerimeter << ")\n";
@@ -74,16 +74,26 @@ PrintUsage(const char* programName)
 	std::cout << "\n";
 
 	std::cout << "SVG output\n";
-	std::cout << "  --desc <value>               Add description (0=off, 1=on, default: " << static_cast<int>(defaults.fShowDescription) << ")\n";
+	std::cout << "  --desc <value>               Add description (0=off, 1=on, default: " << (int)defaults.fShowDescription << ")\n";
 	std::cout << "  --description <text>         Custom description text (default: \"Created with img2svg version 1.0\")\n";
 	std::cout << "  --roundcoords <value>        Round coordinates precision (-1=auto, default: " << defaults.fRoundCoordinates << ")\n";
 	std::cout << "  --scale <value>              Scale factor (default: " << defaults.fScale << ")\n";
-	std::cout << "  --viewbox <value>            Use viewbox instead of width/height (0=off, 1=on, default: " << static_cast<int>(defaults.fUseViewBox) << ")\n";
+	std::cout << "  --viewbox <value>            Use viewbox instead of width/height (0=off, 1=on, default: " << (int)defaults.fUseViewBox << ")\n";
 	std::cout << "\n";
 
 	std::cout << "SVG optimization:\n";
-	std::cout << "  --optimize_svg <value>       Enable SVG optimization (0=off, 1=on, default: " << static_cast<int>(defaults.fOptimizeSvg) << ")\n";
-	std::cout << "  --remove_duplicates <value>  Remove duplicate paths (0=off, 1=on, default: " << static_cast<int>(defaults.fRemoveDuplicates) << ")\n";
+	std::cout << "  --optimize_svg <value>       Enable SVG optimization (0=off, 1=on, default: " << (int)defaults.fOptimizeSvg << ")\n";
+	std::cout << "  --remove_duplicates <value>  Remove duplicate paths (0=off, 1=on, default: " << (int)defaults.fRemoveDuplicates << ")\n";
+	std::cout << "\n";
+
+	std::cout << "Gradient detection:\n";
+	std::cout << "  --detect_gradients <value>   Enable gradient detection (0=off, 1=on, default: " << (int)defaults.fDetectGradients << ")\n";
+	std::cout << "  --grad_stride <value>        Sampling stride in pixels (default: " << defaults.fGradientSampleStride << ")\n";
+	std::cout << "  --grad_r2 <value>            Min R^2 for luminance (default: " << defaults.fGradientMinR2 << ")\n";
+	std::cout << "  --grad_delta <value>         Min RGB distance between endpoints (default: " << defaults.fGradientMinDelta << ")\n";
+	std::cout << "  --grad_min_size <value>      Min size along gradient axis (default: " << defaults.fGradientMinSize << ")\n";
+	std::cout << "  --grad_q_subdiv <value>      Max subdivisions for quadratic flatten (default: " << defaults.fGradientMaxSubdiv << ")\n";
+	std::cout << "  --grad_min_samples <value>   Min samples inside shape (default: " << defaults.fGradientMinSamples << ")\n";
 	std::cout << "\n";
 
 	std::cout << "Debug:\n";
@@ -185,10 +195,10 @@ main(int argc, char* argv[])
 			} else if (strcmp(argv[i], "--remove_bg") == 0) {
 				options.fRemoveBackground = ParseFloat(argv[++i]) > 0.5f;
 			} else if (strcmp(argv[i], "--bg_method") == 0) {
-				int method = static_cast<int>(ParseFloat(argv[++i]));
-				options.fBackgroundMethod = static_cast<BackgroundDetectionMethod>(method);
+				int method = (int)ParseFloat(argv[++i]);
+				options.fBackgroundMethod = (BackgroundDetectionMethod)method;
 			} else if (strcmp(argv[i], "--bg_tolerance") == 0) {
-				options.fBackgroundTolerance = static_cast<int>(ParseFloat(argv[++i]));
+				options.fBackgroundTolerance = (int)ParseFloat(argv[++i]);
 			} else if (strcmp(argv[i], "--bg_ratio") == 0) {
 				options.fMinBackgroundRatio = ParseFloat(argv[++i]);
 			} else if (strcmp(argv[i], "--douglas") == 0) {
@@ -233,6 +243,20 @@ main(int argc, char* argv[])
 				options.fVisvalingamWhyattEnabled = ParseFloat(argv[++i]) > 0.5f;
 			} else if (strcmp(argv[i], "--vw_tolerance") == 0) {
 				options.fVisvalingamWhyattTolerance = ParseFloat(argv[++i]);
+			} else if (strcmp(argv[i], "--detect_gradients") == 0) {
+				options.fDetectGradients = ParseFloat(argv[++i]) > 0.5f;
+			} else if (strcmp(argv[i], "--grad_stride") == 0) {
+				options.fGradientSampleStride = (int)ParseFloat(argv[++i]);
+			} else if (strcmp(argv[i], "--grad_r2") == 0) {
+				options.fGradientMinR2 = ParseFloat(argv[++i]);
+			} else if (strcmp(argv[i], "--grad_delta") == 0) {
+				options.fGradientMinDelta = ParseFloat(argv[++i]);
+			} else if (strcmp(argv[i], "--grad_min_size") == 0) {
+				options.fGradientMinSize = ParseFloat(argv[++i]);
+			} else if (strcmp(argv[i], "--grad_q_subdiv") == 0) {
+				options.fGradientMaxSubdiv = (int)ParseFloat(argv[++i]);
+			} else if (strcmp(argv[i], "--grad_min_samples") == 0) {
+				options.fGradientMinSamples = (int)ParseFloat(argv[++i]);
 			} else {
 				std::cerr << "Warning: Unknown option: " << argv[i] << std::endl;
 				i++;
@@ -259,10 +283,13 @@ main(int argc, char* argv[])
 
 		std::cout << "Conversion completed successfully!" << std::endl;
 		if (options.fRemoveBackground) {
-			std::cout << "Background removal applied using method " << static_cast<int>(options.fBackgroundMethod) << std::endl;
+			std::cout << "Background removal applied using method " << (int)options.fBackgroundMethod << std::endl;
 		}
 		if (options.fVisvalingamWhyattEnabled) {
 			std::cout << "Visvalingam-Whyatt simplification applied with tolerance " << options.fVisvalingamWhyattTolerance << std::endl;
+		}
+		if (options.fDetectGradients) {
+			std::cout << "Gradient detection enabled" << std::endl;
 		}
 
 	} catch (const std::exception& e) {

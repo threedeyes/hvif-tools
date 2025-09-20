@@ -62,4 +62,12 @@ TracingOptions::SetDefaults()
 
 	fVisvalingamWhyattEnabled = false;
 	fVisvalingamWhyattTolerance = 1.0f;
+
+	fDetectGradients = false;
+	fGradientSampleStride = 2;
+	fGradientMinR2 = 0.6f;
+	fGradientMinDelta = 18.0f;
+	fGradientMinSize = 6.0f;
+	fGradientMaxSubdiv = 8;
+	fGradientMinSamples = 40;
 }

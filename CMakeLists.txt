@@ -98,6 +98,7 @@ set(IMG2SVG_PROCESSING_SOURCES
     ${IMG2SVG_PROCESSING_DIR}/GeometryDetector.cpp
     ${IMG2SVG_PROCESSING_DIR}/BackgroundRemover.cpp
     ${IMG2SVG_PROCESSING_DIR}/VisvalingamWhyatt.cpp
+    ${IMG2SVG_PROCESSING_DIR}/GradientDetector.cpp
 )
 
 # Output sources

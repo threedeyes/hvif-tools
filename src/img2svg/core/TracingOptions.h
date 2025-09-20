@@ -75,6 +75,15 @@ public:
 	// Visvalingam-Whyatt simplification
 	bool					fVisvalingamWhyattEnabled;
 	float					fVisvalingamWhyattTolerance;
+
+	// Gradient detection
+	bool                    fDetectGradients;
+	int                     fGradientSampleStride;     // sampling stride in px
+	float                   fGradientMinR2;            // min R^2 for luminance regression
+	float                   fGradientMinDelta;         // min RGB L2 delta between endpoints
+	float                   fGradientMinSize;          // min size along gradient axis
+	int                     fGradientMaxSubdiv;        // subdivisions for quadratic flatten
+	int                     fGradientMinSamples;       // minimum samples inside shape
 };
 
 #endif // TRACING_OPTIONS_H
