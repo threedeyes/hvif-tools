@@ -118,6 +118,7 @@ PathScanner::ScanPaths(std::vector<std::vector<int>>& layerArray, float pathOmit
 
 				int maxIterations = width * height;
 				int iterations = 0;
+				bool closed = false;
 
 				while (!pathFinished && iterations < maxIterations) {
 					std::vector<int> point(3);
@@ -126,7 +127,21 @@ PathScanner::ScanPaths(std::vector<std::vector<int>>& layerArray, float pathOmit
 					point[2] = layerArray[positionY][positionX];
 					currentPath.push_back(point);
 
-					const char* lookupRow = kPathScanCombinedLookup[layerArray[positionY][positionX]][direction];
+					int code = layerArray[positionY][positionX];
+					if (code < 0 || code > 15) {
+						pathFinished = true;
+						closed = false;
+						break;
+					}
+
+					const char* lookupRow = kPathScanCombinedLookup[code][direction];
+
+					if (lookupRow[1] < 0) {
+						pathFinished = true;
+						closed = false;
+						break;
+					}
+
 					layerArray[positionY][positionX] = lookupRow[0];
 					direction = lookupRow[1];
 					positionX += lookupRow[2];
@@ -134,22 +149,30 @@ PathScanner::ScanPaths(std::vector<std::vector<int>>& layerArray, float pathOmit
 
 					if (positionX < 0 || positionX >= width || positionY < 0 || positionY >= height) {
 						pathFinished = true;
+						closed = false;
 						break;
 					}
 
 					if ((positionX - 1) == currentPath[0][0] && (positionY - 1) == currentPath[0][1]) {
 						pathFinished = true;
-						if (holePath || currentPath.size() < pathOmitThreshold) {
-							paths.pop_back();
-						}
+						closed = true;
+						break;
 					}
 
 					iterations++;
 				}
 
-				if (iterations >= maxIterations) {
+				bool removePath = false;
+
+				if (iterations >= maxIterations)
+					removePath = true;
+				else if (!closed)
+					removePath = true;
+				else if (holePath || currentPath.size() < pathOmitThreshold)
+					removePath = true;
+
+				if (removePath)
 					paths.pop_back();
-				}
 			}
 		}
 	}
@@ -178,7 +201,7 @@ PathScanner::CreateInternodes(const std::vector<std::vector<std::vector<int>>>& 
 		std::vector<std::vector<double>>& currentInternodes = internodes.back();
 		int pathLength = paths[pathIndex].size();
 
-		if (pathLength < 2) 
+		if (pathLength < 2)
 			continue;
 
 		for (int pointIndex = 0; pointIndex < pathLength; pointIndex++) {
