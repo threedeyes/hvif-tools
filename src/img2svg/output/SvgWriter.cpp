@@ -14,6 +14,16 @@
 
 #include "SvgWriter.h"
 
+static inline bool _NearlyEqual(double a, double b, double eps)
+{
+	return std::fabs(a - b) < eps;
+}
+
+static inline bool _SamePoint(double x1, double y1, double x2, double y2, double eps)
+{
+	return _NearlyEqual(x1, x2, eps) && _NearlyEqual(y1, y2, eps);
+}
+
 SvgWriter::SvgWriter()
 {
 }
@@ -76,10 +86,46 @@ SvgWriter::_WriteSvgPathString(std::ostringstream& stream,
 								const std::string& description,
 								const std::vector<std::vector<double>>& segments,
 								const std::string& fillPaint,
-								float fillOpacity,
+								float /*fillOpacity*/,
 								const TracingOptions& options)
 {
 	if (segments.empty())
+		return;
+
+	const double eps = 1e-6;
+	std::vector<std::vector<double> > pts;
+	pts.reserve(segments.size() + 1);
+
+	std::vector<double> p0(2);
+	p0[0] = segments[0][1];
+	p0[1] = segments[0][2];
+	pts.push_back(p0);
+
+	for (int i = 0; i < static_cast<int>(segments.size()); i++) {
+		double ex = (segments[i][0] == 1.0) ? segments[i][3] : segments[i][5];
+		double ey = (segments[i][0] == 1.0) ? segments[i][4] : segments[i][6];
+
+		if (!_SamePoint(pts.back()[0], pts.back()[1], ex, ey, eps)) {
+			std::vector<double> pe(2);
+			pe[0] = ex; pe[1] = ey;
+			pts.push_back(pe);
+		}
+	}
+
+	int uniqueCount = 0;
+	for (int i = 0; i < static_cast<int>(pts.size()); i++) {
+		bool dup = false;
+		for (int j = 0; j < i; j++) {
+			if (_SamePoint(pts[i][0], pts[i][1], pts[j][0], pts[j][1], eps)) {
+				dup = true;
+				break;
+			}
+		}
+		if (!dup)
+			uniqueCount++;
+	}
+
+	if (uniqueCount < 3)
 		return;
 
 	float scale = options.fScale;
@@ -118,7 +164,6 @@ SvgWriter::_WriteSvgPathString(std::ostringstream& stream,
 
 	stream << " Z\" />";
 
-	// Debug control points
 	for (int pointIndex = 0; pointIndex < static_cast<int>(segments.size()); pointIndex++) {
 		if ((lineControlPointRadius > 0) && (segments[pointIndex][0] == 1.0)) {
 			stream << "\n  <circle cx=\"" << segments[pointIndex][3] * scale
@@ -202,7 +247,6 @@ SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions&
 	}
 	svgStream << ">";
 
-	// Collect gradients
 	const std::vector<std::vector<IndexedBitmap::LinearGradient>>& grads = indexedBitmap.LinearGradients();
 	bool hasGradients = false;
 	for (size_t k = 0; k < grads.size(); k++) {
@@ -212,7 +256,6 @@ SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions&
 		if (hasGradients) break;
 	}
 
-	// defs with gradients
 	if (hasGradients) {
 		std::ostringstream defs;
 		defs << "\n<defs>";
@@ -230,7 +273,6 @@ SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions&
 		svgStream << defs.str();
 	}
 
-	// Create Z-index map like in the original
 	std::map<double, std::pair<int, int>> zIndexMap;
 	double label;
 
@@ -267,10 +309,8 @@ SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions&
 			description = "";
 		}
 
-		// Check for gradient override
 		std::string colorString = _ColorToSvgString(indexedBitmap.Palette()[layer]);
 		if (layer < static_cast<int>(grads.size()) && path < static_cast<int>(grads[layer].size()) && grads[layer][path].valid) {
-			// Use gradient instead of solid color
 			std::ostringstream gradientFill;
 			gradientFill << "fill=\"url(#lg_" << layer << "_" << path << ")\" ";
 			colorString = gradientFill.str();
