@@ -2,3 +2,6 @@
 	path = external/stb
 	url = https://github.com/nothings/stb
 
+[submodule "external/nanosvg_ext"]
+	path = external/nanosvg_ext
+	url = https://github.com/threedeyes/nanosvg_ext
