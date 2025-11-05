@@ -64,17 +64,15 @@ target_include_directories(svg2hvif
 )
 
 # -----------------------
-# img2svg (ImageTracer)
+# img2svg
 # -----------------------
 
-# Define source directories for img2svg
 set(IMG2SVG_DIR ${SRC_DIR}/img2svg)
 set(IMG2SVG_CORE_DIR ${IMG2SVG_DIR}/core)
 set(IMG2SVG_QUANTIZATION_DIR ${IMG2SVG_DIR}/quantization)
 set(IMG2SVG_PROCESSING_DIR ${IMG2SVG_DIR}/processing)
 set(IMG2SVG_OUTPUT_DIR ${IMG2SVG_DIR}/output)
 
-# Core sources
 set(IMG2SVG_CORE_SOURCES
     ${IMG2SVG_CORE_DIR}/BitmapData.cpp
     ${IMG2SVG_CORE_DIR}/IndexedBitmap.cpp
@@ -82,14 +80,12 @@ set(IMG2SVG_CORE_SOURCES
     ${IMG2SVG_CORE_DIR}/ImageTracer.cpp
 )
 
-# Quantization sources
 set(IMG2SVG_QUANTIZATION_SOURCES
     ${IMG2SVG_QUANTIZATION_DIR}/ColorQuantizer.cpp
     ${IMG2SVG_QUANTIZATION_DIR}/ColorCube.cpp
     ${IMG2SVG_QUANTIZATION_DIR}/ColorNode.cpp
 )
 
-# Processing sources
 set(IMG2SVG_PROCESSING_SOURCES
     ${IMG2SVG_PROCESSING_DIR}/SelectiveBlur.cpp
     ${IMG2SVG_PROCESSING_DIR}/PathScanner.cpp
@@ -101,12 +97,10 @@ set(IMG2SVG_PROCESSING_SOURCES
     ${IMG2SVG_PROCESSING_DIR}/GradientDetector.cpp
 )
 
-# Output sources
 set(IMG2SVG_OUTPUT_SOURCES
     ${IMG2SVG_OUTPUT_DIR}/SvgWriter.cpp
 )
 
-# Combine all sources
 set(IMG2SVG_ALL_SOURCES
     ${IMG2SVG_CORE_SOURCES}
     ${IMG2SVG_QUANTIZATION_SOURCES}
@@ -115,10 +109,8 @@ set(IMG2SVG_ALL_SOURCES
     ${IMG2SVG_DIR}/img2svg.cpp
 )
 
-# Create img2svg executable
 add_executable(img2svg ${IMG2SVG_ALL_SOURCES})
 
-# Set include directories for img2svg
 target_include_directories(img2svg
   PRIVATE
     ${SRC_DIR}/common
@@ -130,10 +122,8 @@ target_include_directories(img2svg
     ${STB_DIR}
 )
 
-# Link libraries for img2svg
 target_link_libraries(img2svg PRIVATE Threads::Threads)
 
-# Compiler specific options for img2svg
 if(HVIF_TOOLS_WARNINGS)
   if(MSVC)
     target_compile_options(img2svg PRIVATE /W4)
@@ -142,23 +132,159 @@ if(HVIF_TOOLS_WARNINGS)
   endif()
 endif()
 
+# ---------------------------
+# Windows Thumbnail Provider
+# ---------------------------
+if(WIN32)
+  option(BUILD_THUMBNAIL_PROVIDER "Build Windows thumbnail provider for HVIF files" ON)
+
+  if(BUILD_THUMBNAIL_PROVIDER)
+    message(STATUS "Building Windows thumbnail provider for HVIF files")
+
+    set(HVIF4WIN_DIR ${SRC_DIR}/hvif4win)
+
+    set(HVIF4WIN_SOURCES
+      ${HVIF4WIN_DIR}/DllMain.cpp
+      ${HVIF4WIN_DIR}/ClassFactory.cpp
+      ${HVIF4WIN_DIR}/HVIFThumbnailProvider.cpp
+      ${SRC_DIR}/hvif2svg/HVIFParser.cpp
+      ${SRC_DIR}/hvif2svg/SVGRenderer.cpp
+    )
+
+    set(HVIF4WIN_HEADERS
+      ${HVIF4WIN_DIR}/Globals.h
+      ${HVIF4WIN_DIR}/ClassFactory.h
+      ${HVIF4WIN_DIR}/HVIFThumbnailProvider.h
+    )
+
+    add_library(HVIFThumbnailProvider SHARED
+      ${HVIF4WIN_SOURCES}
+      ${HVIF4WIN_HEADERS}
+      ${HVIF4WIN_DIR}/HVIFThumbnailProvider.def
+    )
+
+    target_include_directories(HVIFThumbnailProvider
+      PRIVATE
+        ${HVIF4WIN_DIR}
+        ${SRC_DIR}/common
+        ${SRC_DIR}/hvif2svg
+        ${NANOSVG_DIR}
+    )
+
+    target_link_libraries(HVIFThumbnailProvider
+      shlwapi
+      gdi32
+      uuid
+    )
+
+    target_compile_definitions(HVIFThumbnailProvider PRIVATE
+      UNICODE
+      _UNICODE
+      WIN32_LEAN_AND_MEAN
+    )
+
+    set_target_properties(HVIFThumbnailProvider PROPERTIES
+      OUTPUT_NAME "HVIFThumbnailProvider"
+      SUFFIX ".dll"
+    )
+
+    if(HVIF_TOOLS_WARNINGS)
+      if(MSVC)
+        target_compile_options(HVIFThumbnailProvider PRIVATE /W4)
+      endif()
+    endif()
+
+    # Optional: Create registration/unregistration batch scripts
+    if(CMAKE_CONFIGURATION_TYPES)
+      set(DLL_OUTPUT_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>")
+    else()
+      set(DLL_OUTPUT_PATH "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    endif()
+
+    # Generate register script
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/register_provider.bat"
+      "@echo off\n"
+      "echo Registering HVIF Thumbnail Provider...\n"
+      "echo.\n"
+      "echo This requires Administrator privileges!\n"
+      "echo.\n"
+      "regsvr32 /s \"${DLL_OUTPUT_PATH}/HVIFThumbnailProvider.dll\"\n"
+      "if %ERRORLEVEL% EQU 0 (\n"
+      "    echo Successfully registered!\n"
+      "    echo Restarting Windows Explorer...\n"
+      "    taskkill /f /im explorer.exe >nul 2>&1\n"
+      "    start explorer.exe\n"
+      "    echo Done!\n"
+      ") else (\n"
+      "    echo Registration failed! Please run as Administrator.\n"
+      ")\n"
+      "pause\n"
+    )
+
+    # Generate unregister script
+    file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/unregister_provider.bat"
+      "@echo off\n"
+      "echo Unregistering HVIF Thumbnail Provider...\n"
+      "echo.\n"
+      "regsvr32 /u /s \"${DLL_OUTPUT_PATH}/HVIFThumbnailProvider.dll\"\n"
+      "if %ERRORLEVEL% EQU 0 (\n"
+      "    echo Successfully unregistered!\n"
+      "    echo Restarting Windows Explorer...\n"
+      "    taskkill /f /im explorer.exe >nul 2>&1\n"
+      "    start explorer.exe\n"
+      "    echo Done!\n"
+      ") else (\n"
+      "    echo Unregistration failed!\n"
+      ")\n"
+      "pause\n"
+    )
+
+  endif()
+endif()
+
 # -----------------------
 # Installation
 # -----------------------
 include(GNUInstallDirs)
+
+# Install executables
 install(TARGETS hvif2svg svg2hvif img2svg
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
+# Install Windows thumbnail provider
+if(WIN32 AND BUILD_THUMBNAIL_PROVIDER)
+  install(TARGETS HVIFThumbnailProvider
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
+
+  install(FILES
+    "${CMAKE_CURRENT_BINARY_DIR}/register_provider.bat"
+    "${CMAKE_CURRENT_BINARY_DIR}/unregister_provider.bat"
+    DESTINATION ${CMAKE_INSTALL_BINDIR}
+  )
+endif()
+
 # Optional: Add custom target to build all utilities
-add_custom_target(all-tools
-  DEPENDS hvif2svg svg2hvif img2svg
-  COMMENT "Building all hvif-tools utilities"
-)
+if(WIN32 AND BUILD_THUMBNAIL_PROVIDER)
+  add_custom_target(all-tools
+    DEPENDS hvif2svg svg2hvif img2svg HVIFThumbnailProvider
+    COMMENT "Building all hvif-tools utilities including Windows thumbnail provider"
+  )
+else()
+  add_custom_target(all-tools
+    DEPENDS hvif2svg svg2hvif img2svg
+    COMMENT "Building all hvif-tools utilities"
+  )
+endif()
 
 # Optional: Print build information
 message(STATUS "Building hvif-tools with the following utilities:")
 message(STATUS "  - hvif2svg: Convert HVIF to SVG")
 message(STATUS "  - svg2hvif: Convert SVG to HVIF")
 message(STATUS "  - img2svg:  Convert bitmap images to SVG")
+if(WIN32 AND BUILD_THUMBNAIL_PROVIDER)
+  message(STATUS "  - HVIFThumbnailProvider: Windows thumbnail provider for HVIF files")
+endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
