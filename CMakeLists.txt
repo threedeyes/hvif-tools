@@ -66,7 +66,6 @@ target_include_directories(svg2hvif
 # -----------------------
 # img2svg
 # -----------------------
-
 set(IMG2SVG_DIR ${SRC_DIR}/img2svg)
 set(IMG2SVG_CORE_DIR ${IMG2SVG_DIR}/core)
 set(IMG2SVG_QUANTIZATION_DIR ${IMG2SVG_DIR}/quantization)
@@ -142,6 +141,19 @@ if(HVIF_TOOLS_WARNINGS)
     target_compile_options(img2svg PRIVATE -Wall -Wextra -Wpedantic)
   endif()
 endif()
+
+# ---------------------------
+# BMessage dump tool
+# ---------------------------
+add_executable(message
+  ${SRC_DIR}/message/message.cpp
+  ${SRC_DIR}/common/BMessage.cpp
+)
+
+target_include_directories(message
+  PRIVATE
+    ${SRC_DIR}/common
+)
 
 # ---------------------------
 # Windows Thumbnail Provider
