@@ -6,6 +6,7 @@
 #ifndef SELECTIVE_BLUR_H
 #define SELECTIVE_BLUR_H
 
+#include <vector>
 #include "BitmapData.h"
 
 class SelectiveBlur {
@@ -13,11 +14,11 @@ public:
 							SelectiveBlur();
 							~SelectiveBlur();
 
-	BitmapData              BlurBitmap(const BitmapData& bitmap,
+	BitmapData				BlurBitmap(const BitmapData& bitmap,
 									float radius, float delta);
 
 private:
-	static const double     kGaussianKernels[5][11];
+	std::vector<double>		_GenerateGaussianKernel(int radius);
 };
 
-#endif // SELECTIVE_BLUR_H
+#endif

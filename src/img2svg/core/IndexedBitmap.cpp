@@ -11,8 +11,8 @@ IndexedBitmap::IndexedBitmap()
 {
 }
 
-IndexedBitmap::IndexedBitmap(const std::vector<std::vector<int>>& indexArray,
-							const std::vector<std::vector<unsigned char>>& palette)
+IndexedBitmap::IndexedBitmap(const std::vector<std::vector<int> >& indexArray,
+							const std::vector<std::vector<unsigned char> >& palette)
 	: fArray(indexArray)
 	, fPalette(palette)
 {
@@ -26,8 +26,7 @@ IndexedBitmap::IndexedBitmap(const std::vector<std::vector<int>>& indexArray,
 }
 
 void
-IndexedBitmap::SetLayers(const std::vector<std::vector<std::vector<std::vector<double>>>>& layers)
+IndexedBitmap::SetLayers(const std::vector<std::vector<std::vector<std::vector<double> > > >& layers)
 {
 	fLayers = layers;
-	// TODO: Keep existing gradients unless explicitly overwritten by SetLinearGradients() ???
 }

@@ -32,10 +32,33 @@ private:
 	void		_Bounds(const std::vector<std::vector<double>>& pts,
 						double& minX, double& minY, double& maxX, double& maxY);
 
-	bool		_Solve3x3(double M[3][3], double B[3], double X[3]);
 	double		_Luma(unsigned char r, unsigned char g, unsigned char b);
 	void		_ClampColor(double& v);
 	double		_L2rgb(const unsigned char a[3], const unsigned char b[3]);
+
+	double		_PointSegmentDistance(double px, double py, double x1, double y1, double x2, double y2);
+	double		_DistanceToPolygon(double px, double py, const std::vector<std::vector<double> >& poly);
+
+	double		_ComputeVariance(const std::vector<double>& vals,
+	                            const std::vector<double>& weights);
+
+	bool		_ComputeChannelGradient(const std::vector<double>& vx,
+	                               const std::vector<double>& vy,
+	                               const std::vector<double>& vw,
+	                               const std::vector<double>& vals,
+	                               double& outGradX,
+	                               double& outGradY,
+	                               double& outR2);
+
+	bool		_ComputeRobustDirection(const std::vector<double>& vx,
+	                               const std::vector<double>& vy,
+	                               const std::vector<double>& vw,
+	                               const std::vector<double>& vr,
+	                               const std::vector<double>& vg,
+	                               const std::vector<double>& vb,
+	                               double& outDirX,
+	                               double& outDirY,
+	                               double& outConfidence);
 
 	IndexedBitmap::LinearGradient
 		_DetectForPath(int layerIndex,
@@ -45,4 +68,4 @@ private:
 					   const TracingOptions& options);
 };
 
-#endif // GRADIENT_DETECTOR_H
+#endif

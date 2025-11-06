@@ -3,6 +3,8 @@
  * Distributed under the terms of the MIT License.
  */
 
+#include <climits>
+
 #include "BitmapData.h"
 
 BitmapData::BitmapData()
@@ -16,16 +18,50 @@ BitmapData::BitmapData(int width, int height, const std::vector<unsigned char>& 
 	, fHeight(height)
 	, fData(data)
 {
-	if (fData.size() != static_cast<size_t>(fWidth * fHeight * 4)) {
-		fData.resize(fWidth * fHeight * 4, 0);
+	if (fWidth < 0 || fHeight < 0) {
+		fWidth = 0;
+		fHeight = 0;
+		fData.clear();
+		return;
 	}
+
+	if (fWidth > 0 && fHeight > INT_MAX / fWidth) {
+		fWidth = 0;
+		fHeight = 0;
+		fData.clear();
+		return;
+	}
+
+	int pixelCount = fWidth * fHeight;
+	if (pixelCount > INT_MAX / 4) {
+		fWidth = 0;
+		fHeight = 0;
+		fData.clear();
+		return;
+	}
+
+	size_t requiredSize = static_cast<size_t>(pixelCount) * 4;
+
+	if (fData.size() != requiredSize)
+		fData.resize(requiredSize, 0);
 }
 
 bool
 BitmapData::IsValid() const
 {
-	return fWidth > 0 && fHeight > 0 && 
-		   fData.size() == static_cast<size_t>(fWidth * fHeight * 4);
+	if (fWidth <= 0 || fHeight <= 0)
+		return false;
+
+	if (fWidth > INT_MAX / fHeight)
+		return false;
+
+	int pixelCount = fWidth * fHeight;
+	if (pixelCount > INT_MAX / 4)
+		return false;
+
+	size_t requiredSize = static_cast<size_t>(pixelCount) * 4;
+
+	return fData.size() == requiredSize;
 }
 
 unsigned char

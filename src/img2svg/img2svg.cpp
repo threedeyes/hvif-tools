@@ -37,7 +37,7 @@ PrintUsage(const char* programName)
 
 	std::cout << "Background removal:\n";
 	std::cout << "  --remove_bg <value>          Remove background (0=off, 1=on, default: " << (int)defaults.fRemoveBackground << ")\n";
-	std::cout << "  --bg_method <value>          Background detection method (0=edge, 1=flood, 2=dominant, 3=clustering, 4=combined, default: 4)\n";
+	std::cout << "  --bg_method <value>          Background detection method (0=simple, 1=auto, default: 1)\n";
 	std::cout << "  --bg_tolerance <value>       Background color tolerance (default: " << defaults.fBackgroundTolerance << ")\n";
 	std::cout << "  --bg_ratio <value>           Minimum background ratio (default: " << defaults.fMinBackgroundRatio << ")\n";
 	std::cout << "\n";
@@ -73,7 +73,7 @@ PrintUsage(const char* programName)
 	std::cout << "  --min_width <value>          Minimum object width in pixels (default: " << defaults.fMinObjectWidth << ")\n";
 	std::cout << "\n";
 
-	std::cout << "SVG output\n";
+	std::cout << "SVG output:\n";
 	std::cout << "  --desc <value>               Add description (0=off, 1=on, default: " << (int)defaults.fShowDescription << ")\n";
 	std::cout << "  --description <text>         Custom description text (default: \"Created with img2svg version 1.0\")\n";
 	std::cout << "  --roundcoords <value>        Round coordinates precision (-1=auto, default: " << defaults.fRoundCoordinates << ")\n";
@@ -96,11 +96,6 @@ PrintUsage(const char* programName)
 	std::cout << "  --grad_min_samples <value>   Min samples inside shape (default: " << defaults.fGradientMinSamples << ")\n";
 	std::cout << "\n";
 
-	std::cout << "Debug:\n";
-	std::cout << "  --lcpr <value>               Linear control point radius for debug (default: " << defaults.fLineControlPointRadius << ")\n";
-	std::cout << "  --qcpr <value>               Quadratic control point radius for debug (default: " << defaults.fQuadraticControlPointRadius << ")\n";
-	std::cout << "\n";
-
 	std::cout << "Help:\n";
 	std::cout << "  --help                       Show this help\n";
 	std::cout << "\n";
@@ -108,7 +103,7 @@ PrintUsage(const char* programName)
 	std::cout << "  " << programName << " input.png output.svg\n";
 	std::cout << "  " << programName << " input.jpg output.svg --colors 16 --scale 2\n";
 	std::cout << "  " << programName << " input.png output.svg --douglas 1 --optimize_svg 1\n";
-	std::cout << "  " << programName << " input.png output.svg --remove_bg 1 --bg_method 4 --bg_tolerance 15\n";
+	std::cout << "  " << programName << " input.png output.svg --remove_bg 1 --bg_method 1 --bg_tolerance 15\n";
 	std::cout << "  " << programName << " input.png output.svg --vw_enable 1 --vw_tolerance 1.5\n";
 }
 
@@ -178,10 +173,6 @@ main(int argc, char* argv[])
 				options.fScale = ParseFloat(argv[++i]);
 			} else if (strcmp(argv[i], "--roundcoords") == 0) {
 				options.fRoundCoordinates = ParseFloat(argv[++i]);
-			} else if (strcmp(argv[i], "--lcpr") == 0) {
-				options.fLineControlPointRadius = ParseFloat(argv[++i]);
-			} else if (strcmp(argv[i], "--qcpr") == 0) {
-				options.fQuadraticControlPointRadius = ParseFloat(argv[++i]);
 			} else if (strcmp(argv[i], "--desc") == 0) {
 				options.fShowDescription = ParseFloat(argv[++i]) > 0.5f;
 			} else if (strcmp(argv[i], "--description") == 0) {
@@ -196,7 +187,11 @@ main(int argc, char* argv[])
 				options.fRemoveBackground = ParseFloat(argv[++i]) > 0.5f;
 			} else if (strcmp(argv[i], "--bg_method") == 0) {
 				int method = (int)ParseFloat(argv[++i]);
-				options.fBackgroundMethod = (BackgroundDetectionMethod)method;
+				if (method == 0 || method == 1) {
+					options.fBackgroundMethod = (BackgroundDetectionMethod)method;
+				} else {
+					options.fBackgroundMethod = AUTO;
+				}
 			} else if (strcmp(argv[i], "--bg_tolerance") == 0) {
 				options.fBackgroundTolerance = (int)ParseFloat(argv[++i]);
 			} else if (strcmp(argv[i], "--bg_ratio") == 0) {

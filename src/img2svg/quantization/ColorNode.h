@@ -17,51 +17,48 @@ public:
 							ColorNode(ColorNode* parent, int nodeId, int nodeLevel);
 							~ColorNode();
 
-	void                    PruneChild();
-	void                    PruneLevel();
-	int                     Reduce(int threshold, int nextThreshold);
-	void                    CreateColormap();
-	void                    FindClosestColor(int red, int green, int blue,
+	void					PruneChild();
+	void					PruneLevel();
+	int						Reduce(int threshold, int nextThreshold);
+	void					CreateColormap();
+	void					FindClosestColor(int red, int green, int blue, int alpha,
 											ColorSearchResult& search);
 
-	// Getters
-	ColorNode*              GetChild(int index) const;
-	ColorNode*              GetParent() const { return fParent; }
-	int                     GetMidRed() const { return fMidRed; }
-	int                     GetMidGreen() const { return fMidGreen; }
-	int                     GetMidBlue() const { return fMidBlue; }
+	ColorNode*				GetChild(int index) const;
+	ColorNode*				GetParent() const { return fParent; }
+	int						GetMidRed() const { return fMidRed; }
+	int						GetMidGreen() const { return fMidGreen; }
+	int						GetMidBlue() const { return fMidBlue; }
+	int						GetMidAlpha() const { return fMidAlpha; }
 
-	// Setters
-	void                    SetChild(int index, ColorNode* child);
+	void					SetChild(int index, ColorNode* child);
 
-	// Pixel operations
-	void                    AddPixelCount(int count) { fNumberPixels += count; }
-	void                    IncrementUniqueCount() { ++fUniqueCount; }
-	void                    AddColor(int red, int green, int blue);
+	void					AddPixelCount(int count) { fNumberPixels += count; }
+	void					IncrementUniqueCount() { ++fUniqueCount; }
+	void					AddColor(int red, int green, int blue, int alpha);
 
-	// Static utility
-	static int              GetShift(int level);
+	static int				GetShift(int level);
 
 private:
-	static int              _CalculateDistance(int color, int red, int green, int blue);
+	ColorCube*				fCube;
+	ColorNode*				fParent;
+	std::vector<ColorNode*>	fChildren;
+	int						fChildCount;
 
-	ColorCube*              fCube;
-	ColorNode*              fParent;
-	std::vector<ColorNode*> fChildren;
-	int                     fChildCount;
+	int						fId;
+	int						fLevel;
+	int						fMidRed;
+	int						fMidGreen;
+	int						fMidBlue;
+	int						fMidAlpha;
 
-	int                     fId;
-	int                     fLevel;
-	int                     fMidRed;
-	int                     fMidGreen;
-	int                     fMidBlue;
-
-	int                     fNumberPixels;
-	int                     fUniqueCount;
-	int                     fTotalRed;
-	int                     fTotalGreen;
-	int                     fTotalBlue;
-	int                     fColorNumber;
+	int						fNumberPixels;
+	int						fUniqueCount;
+	int						fTotalRed;
+	int						fTotalGreen;
+	int						fTotalBlue;
+	int						fTotalAlpha;
+	int						fColorNumber;
 };
 
-#endif // COLOR_NODE_H
+#endif

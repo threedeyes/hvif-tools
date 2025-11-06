@@ -14,19 +14,18 @@ public:
 							BitmapData(int width, int height, 
 									const std::vector<unsigned char>& data);
 
-	int                     Width() const { return fWidth; }
-	int                     Height() const { return fHeight; }
+	int						Width() const { return fWidth; }
+	int						Height() const { return fHeight; }
 	const std::vector<unsigned char>& Data() const { return fData; }
 
-	bool                    IsValid() const;
-	unsigned char           GetPixelComponent(int x, int y, int component) const;
-	void                    SetPixelComponent(int x, int y, int component, 
-									unsigned char value);
+	bool					IsValid() const;
+	unsigned char			GetPixelComponent(int x, int y, int component) const;
+	void					SetPixelComponent(int x, int y, int component, unsigned char value);
 
 private:
-	int                     fWidth;
-	int                     fHeight;
+	int						fWidth;
+	int						fHeight;
 	std::vector<unsigned char> fData;
 };
 
-#endif // BITMAP_DATA_H
+#endif

@@ -13,17 +13,15 @@ TracingOptions::TracingOptions()
 void
 TracingOptions::SetDefaults()
 {
-	fLineThreshold = 1.0f;
-	fQuadraticThreshold = 1.0f;
+	fLineThreshold = 2.0f;
+	fQuadraticThreshold = 0.5f;
 	fPathOmitThreshold = 10.0f;
 
 	fNumberOfColors = 8.0f;
-	fColorQuantizationCycles = 10.0f;
+	fColorQuantizationCycles = 16.0f;
 
 	fScale = 1.0f;
 	fRoundCoordinates = 1.0f;
-	fLineControlPointRadius = 0.0f;
-	fQuadraticControlPointRadius = 0.0f;
 	fShowDescription = true;
 	fCustomDescription = "";
 	fUseViewBox = false;
@@ -32,17 +30,17 @@ TracingOptions::SetDefaults()
 	fBlurDelta = 20.0f;
 
 	fRemoveBackground = false;
-	fBackgroundMethod = BackgroundDetectionMethod::COMBINED;
+	fBackgroundMethod = AUTO;
 	fBackgroundTolerance = 10;
 	fMinBackgroundRatio = 0.3;
 
 	fDouglasPeuckerEnabled = false;
-	fDouglasPeuckerTolerance = 2.0f;
+	fDouglasPeuckerTolerance = 0.5f;
 	fDouglasPeuckerCurveProtection = 0.5f;
 
 	fDetectGeometry = false;
 	fLineTolerance = 2.0f;
-	fCircleTolerance = 1.5f;
+	fCircleTolerance = 5.0f;
 	fMinCircleRadius = 3.0f;
 	fMaxCircleRadius = 1000.0f;
 
@@ -54,7 +52,7 @@ TracingOptions::SetDefaults()
 	fMinSegmentLength = 2.0f;
 	fCurveSmoothing = 0.0f;
 
-	fFilterSmallObjects = false;
+	fFilterSmallObjects = true;
 	fMinObjectArea = 10.0f;
 	fMinObjectWidth = 3.0f;
 	fMinObjectHeight = 3.0f;
@@ -70,4 +68,20 @@ TracingOptions::SetDefaults()
 	fGradientMinSize = 6.0f;
 	fGradientMaxSubdiv = 8;
 	fGradientMinSamples = 40;
+
+	fGradientMinR2Total = 0.72f;
+	fGradientMinAlpha = 12;
+	fGradientUseLinearRGB = true;
+
+	fRegionMergeBoundaryColorTol = 18.0f;
+	fRegionMergeAngleToleranceDeg = 30.0f;
+	fRegionMergeMinBoundaryCount = 5;
+	fRegionMergeUseLinearRGB = false;
+
+	fKeepHolePaths = true;
+	fMinHolePathRatio = 0.0f;
+
+	fSpatialCoherence = true;
+	fSpatialCoherenceRadius = 2;
+	fSpatialCoherencePasses = 2;
 }

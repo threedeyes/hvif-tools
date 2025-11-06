@@ -13,7 +13,6 @@
 BackgroundRemover::BackgroundRemover()
 	: fColorTolerance(10)
 	, fMinBackgroundRatio(0.3)
-	, fEdgeWeight(2.0)
 {
 }
 
@@ -32,62 +31,20 @@ BackgroundRemover::RemoveBackground(const BitmapData& bitmap,
 	ColorKey backgroundColor;
 
 	switch (method) {
-		case EDGE_ANALYSIS:
-			backgroundColor = DetectBackgroundByEdgeAnalysis(bitmap, tolerance);
+		case SIMPLE:
+			backgroundColor = _DetectBackgroundSimple(bitmap, tolerance);
 			break;
-		case FLOOD_FILL:
-			backgroundColor = DetectBackgroundByFloodFill(bitmap, tolerance);
-			break;
-		case DOMINANT_COLOR:
-			backgroundColor = DetectBackgroundByDominantColor(bitmap);
-			break;
-		case CLUSTERING:
-			backgroundColor = DetectBackgroundByClustering(bitmap, tolerance);
-			break;
-		case COMBINED:
+		case AUTO:
 		default:
-			backgroundColor = DetectBackgroundCombined(bitmap, tolerance);
+			backgroundColor = _DetectBackgroundAuto(bitmap, tolerance);
 			break;
 	}
 
-	return ApplyBackgroundRemoval(bitmap, backgroundColor, tolerance);
+	return _ApplyBackgroundRemoval(bitmap, backgroundColor, tolerance);
 }
 
 ColorKey
-BackgroundRemover::DetectBackgroundByEdgeAnalysis(const BitmapData& bitmap, int tolerance)
-{
-	std::vector<ColorKey> edgeColors = GetEdgeColors(bitmap);
-	std::map<ColorKey, int> colorCount;
-
-	for (std::vector<ColorKey>::const_iterator it = edgeColors.begin(); it != edgeColors.end(); ++it) {
-		const ColorKey& color = *it;
-		bool found = false;
-		for (std::map<ColorKey, int>::iterator mapIt = colorCount.begin(); mapIt != colorCount.end(); ++mapIt) {
-			if (ColorsMatch(color, mapIt->first, tolerance)) {
-				mapIt->second++;
-				found = true;
-				break;
-			}
-		}
-		if (!found)
-			colorCount[color] = 1;
-	}
-
-	ColorKey mostFrequent = {0, 0, 0, 255};
-	int maxCount = 0;
-
-	for (std::map<ColorKey, int>::const_iterator it = colorCount.begin(); it != colorCount.end(); ++it) {
-		if (it->second > maxCount) {
-			maxCount = it->second;
-			mostFrequent = it->first;
-		}
-	}
-
-	return mostFrequent;
-}
-
-ColorKey
-BackgroundRemover::DetectBackgroundByFloodFill(const BitmapData& bitmap, int tolerance)
+BackgroundRemover::_DetectBackgroundSimple(const BitmapData& bitmap, int tolerance)
 {
 	int width = bitmap.Width();
 	int height = bitmap.Height();
@@ -111,14 +68,8 @@ BackgroundRemover::DetectBackgroundByFloodFill(const BitmapData& bitmap, int tol
 		int y = it->second;
 
 		if (!visited[y][x]) {
-			ColorKey startColor = {
-				bitmap.GetPixelComponent(x, y, 0),
-				bitmap.GetPixelComponent(x, y, 1),
-				bitmap.GetPixelComponent(x, y, 2),
-				bitmap.GetPixelComponent(x, y, 3)
-			};
-
-			int area = FloodFillCount(bitmap, x, y, startColor, tolerance, visited);
+			ColorKey startColor = _GetPixelColor(bitmap, x, y);
+			int area = _FloodFillCount(bitmap, x, y, startColor, tolerance, visited);
 
 			if (area > 0) {
 				FloodResult result;
@@ -143,109 +94,72 @@ BackgroundRemover::DetectBackgroundByFloodFill(const BitmapData& bitmap, int tol
 }
 
 ColorKey
-BackgroundRemover::DetectBackgroundByDominantColor(const BitmapData& bitmap)
+BackgroundRemover::_DetectBackgroundAuto(const BitmapData& bitmap, int tolerance)
 {
-	std::map<ColorKey, int> histogram = GetColorHistogram(bitmap);
+	ColorKey floodColor = _DetectBackgroundSimple(bitmap, tolerance);
 
-	ColorKey dominantColor = {0, 0, 0, 255};
-	int maxCount = 0;
+	double floodScore = _CalculateEdgeScore(bitmap, floodColor, tolerance) * 2.0 +
+						_CalculateConnectivityScore(bitmap, floodColor, tolerance);
 
-	for (std::map<ColorKey, int>::const_iterator it = histogram.begin(); it != histogram.end(); ++it) {
-		if (it->second > maxCount) {
-			maxCount = it->second;
-			dominantColor = it->first;
+	int width = bitmap.Width();
+	int height = bitmap.Height();
+	int totalPixels = width * height;
+
+	int edgePixelCount = (width * 2) + ((height - 2) * 2);
+	std::vector<ColorKey> edgeColors;
+	edgeColors.reserve(edgePixelCount);
+
+	for (int x = 0; x < width; x++) {
+		edgeColors.push_back(_GetPixelColor(bitmap, x, 0));
+		edgeColors.push_back(_GetPixelColor(bitmap, x, height-1));
+	}
+
+	for (int y = 1; y < height-1; y++) {
+		edgeColors.push_back(_GetPixelColor(bitmap, 0, y));
+		edgeColors.push_back(_GetPixelColor(bitmap, width-1, y));
+	}
+
+	std::map<ColorKey, int> edgeHistogram;
+	for (std::vector<ColorKey>::const_iterator it = edgeColors.begin(); it != edgeColors.end(); ++it) {
+		bool found = false;
+		for (std::map<ColorKey, int>::iterator mapIt = edgeHistogram.begin(); mapIt != edgeHistogram.end(); ++mapIt) {
+			if (_ColorsMatch(*it, mapIt->first, tolerance)) {
+				mapIt->second++;
+				found = true;
+				break;
+			}
+		}
+		if (!found)
+			edgeHistogram[*it] = 1;
+	}
+
+	ColorKey edgeColor = {0, 0, 0, 255};
+	int maxEdgeCount = 0;
+
+	for (std::map<ColorKey, int>::const_iterator it = edgeHistogram.begin(); it != edgeHistogram.end(); ++it) {
+		if (it->second > maxEdgeCount) {
+			maxEdgeCount = it->second;
+			edgeColor = it->first;
 		}
 	}
 
-	return dominantColor;
-}
+	double edgeScore = _CalculateEdgeScore(bitmap, edgeColor, tolerance) * 2.0 +
+					   _CalculateConnectivityScore(bitmap, edgeColor, tolerance);
 
-ColorKey
-BackgroundRemover::DetectBackgroundByClustering(const BitmapData& bitmap, int tolerance)
-{
-	std::map<ColorKey, int> histogram = GetColorHistogram(bitmap);
-	std::vector<BackgroundCandidate> clusters = ClusterSimilarColors(histogram, tolerance);
+	if (_ColorsMatch(floodColor, edgeColor, tolerance))
+		return floodColor;
 
-	ColorKey bestColor = {0, 0, 0, 255};
-	double bestScore = -1.0;
-
-	for (std::vector<BackgroundCandidate>::iterator it = clusters.begin(); it != clusters.end(); ++it) {
-		it->edgeScore = CalculateEdgeScore(bitmap, it->color, tolerance);
-		it->connectivityScore = CalculateConnectivityScore(bitmap, it->color, tolerance);
-
-		double score = (static_cast<double>(it->frequency) / (bitmap.Width() * bitmap.Height())) * 0.3 +
-						it->edgeScore * 0.4 +
-						it->connectivityScore * 0.3;
-
-		if (score > bestScore) {
-			bestScore = score;
-			bestColor = it->color;
-		}
-	}
-
-	return bestColor;
-}
-
-ColorKey
-BackgroundRemover::DetectBackgroundCombined(const BitmapData& bitmap, int tolerance)
-{
-	std::vector<BackgroundCandidate> candidates;
-
-	ColorKey edgeColor = DetectBackgroundByEdgeAnalysis(bitmap, tolerance);
-	BackgroundCandidate edgeCandidate;
-	edgeCandidate.color = edgeColor;
-	edgeCandidate.edgeScore = CalculateEdgeScore(bitmap, edgeColor, tolerance);
-	edgeCandidate.connectivityScore = CalculateConnectivityScore(bitmap, edgeColor, tolerance);
-	candidates.push_back(edgeCandidate);
-
-	ColorKey floodColor = DetectBackgroundByFloodFill(bitmap, tolerance);
-	if (!ColorsMatch(floodColor, edgeColor, tolerance)) {
-		BackgroundCandidate floodCandidate;
-		floodCandidate.color = floodColor;
-		floodCandidate.edgeScore = CalculateEdgeScore(bitmap, floodColor, tolerance);
-		floodCandidate.connectivityScore = CalculateConnectivityScore(bitmap, floodColor, tolerance);
-		candidates.push_back(floodCandidate);
-	}
-
-	ColorKey dominantColor = DetectBackgroundByDominantColor(bitmap);
-	bool alreadyExists = false;
-	for (std::vector<BackgroundCandidate>::const_iterator it = candidates.begin(); it != candidates.end(); ++it) {
-		if (ColorsMatch(dominantColor, it->color, tolerance)) {
-			alreadyExists = true;
-			break;
-		}
-	}
-
-	if (!alreadyExists) {
-		BackgroundCandidate dominantCandidate;
-		dominantCandidate.color = dominantColor;
-		dominantCandidate.edgeScore = CalculateEdgeScore(bitmap, dominantColor, tolerance);
-		dominantCandidate.connectivityScore = CalculateConnectivityScore(bitmap, dominantColor, tolerance);
-		candidates.push_back(dominantCandidate);
-	}
-
-	double bestScore = -1.0;
-	ColorKey bestColor = {0, 0, 0, 255};
-
-	for (std::vector<BackgroundCandidate>::const_iterator it = candidates.begin(); it != candidates.end(); ++it) {
-		double score = it->edgeScore * fEdgeWeight + it->connectivityScore;
-		if (score > bestScore) {
-			bestScore = score;
-			bestColor = it->color;
-		}
-	}
-
-	return bestColor;
+	return (edgeScore > floodScore) ? edgeColor : floodColor;
 }
 
 bool
-BackgroundRemover::ColorsMatch(const ColorKey& c1, const ColorKey& c2, int tolerance) const
+BackgroundRemover::_ColorsMatch(const ColorKey& c1, const ColorKey& c2, int tolerance) const
 {
-	return CalculateColorDistance(c1, c2) <= tolerance;
+	return _CalculateColorDistance(c1, c2) <= tolerance;
 }
 
 int
-BackgroundRemover::CalculateColorDistance(const ColorKey& c1, const ColorKey& c2) const
+BackgroundRemover::_CalculateColorDistance(const ColorKey& c1, const ColorKey& c2) const
 {
 	int dr = abs(static_cast<int>(c1.r) - static_cast<int>(c2.r));
 	int dg = abs(static_cast<int>(c1.g) - static_cast<int>(c2.g));
@@ -255,54 +169,8 @@ BackgroundRemover::CalculateColorDistance(const ColorKey& c1, const ColorKey& c2
 	return dr + dg + db + da;
 }
 
-std::vector<ColorKey>
-BackgroundRemover::GetEdgeColors(const BitmapData& bitmap) const
-{
-	std::vector<ColorKey> edgeColors;
-	int width = bitmap.Width();
-	int height = bitmap.Height();
-
-	for (int x = 0; x < width; x++) {
-		ColorKey topColor = {
-			bitmap.GetPixelComponent(x, 0, 0),
-			bitmap.GetPixelComponent(x, 0, 1),
-			bitmap.GetPixelComponent(x, 0, 2),
-			bitmap.GetPixelComponent(x, 0, 3)
-		};
-		edgeColors.push_back(topColor);
-
-		ColorKey bottomColor = {
-			bitmap.GetPixelComponent(x, height-1, 0),
-			bitmap.GetPixelComponent(x, height-1, 1),
-			bitmap.GetPixelComponent(x, height-1, 2),
-			bitmap.GetPixelComponent(x, height-1, 3)
-		};
-		edgeColors.push_back(bottomColor);
-	}
-
-	for (int y = 1; y < height-1; y++) {
-		ColorKey leftColor = {
-			bitmap.GetPixelComponent(0, y, 0),
-			bitmap.GetPixelComponent(0, y, 1),
-			bitmap.GetPixelComponent(0, y, 2),
-			bitmap.GetPixelComponent(0, y, 3)
-		};
-		edgeColors.push_back(leftColor);
-
-		ColorKey rightColor = {
-			bitmap.GetPixelComponent(width-1, y, 0),
-			bitmap.GetPixelComponent(width-1, y, 1),
-			bitmap.GetPixelComponent(width-1, y, 2),
-			bitmap.GetPixelComponent(width-1, y, 3)
-		};
-		edgeColors.push_back(rightColor);
-	}
-
-	return edgeColors;
-}
-
 int
-BackgroundRemover::FloodFillCount(const BitmapData& bitmap, int startX, int startY, 
+BackgroundRemover::_FloodFillCount(const BitmapData& bitmap, int startX, int startY,
 								const ColorKey& targetColor, int tolerance,
 								std::vector<std::vector<bool> >& visited) const
 {
@@ -322,14 +190,9 @@ BackgroundRemover::FloodFillCount(const BitmapData& bitmap, int startX, int star
 		if (x < 0 || x >= width || y < 0 || y >= height || visited[y][x])
 			continue;
 
-		ColorKey currentColor = {
-			bitmap.GetPixelComponent(x, y, 0),
-			bitmap.GetPixelComponent(x, y, 1),
-			bitmap.GetPixelComponent(x, y, 2),
-			bitmap.GetPixelComponent(x, y, 3)
-		};
+		ColorKey currentColor = _GetPixelColor(bitmap, x, y);
 
-		if (!ColorsMatch(currentColor, targetColor, tolerance))
+		if (!_ColorsMatch(currentColor, targetColor, tolerance))
 			continue;
 
 		visited[y][x] = true;
@@ -345,22 +208,34 @@ BackgroundRemover::FloodFillCount(const BitmapData& bitmap, int startX, int star
 }
 
 double
-BackgroundRemover::CalculateEdgeScore(const BitmapData& bitmap, const ColorKey& color, int tolerance) const
+BackgroundRemover::_CalculateEdgeScore(const BitmapData& bitmap, const ColorKey& color, int tolerance) const
 {
-	std::vector<ColorKey> edgeColors = GetEdgeColors(bitmap);
+	int width = bitmap.Width();
+	int height = bitmap.Height();
 	int matchCount = 0;
+	int totalCount = 0;
 
-	for (std::vector<ColorKey>::const_iterator it = edgeColors.begin(); it != edgeColors.end(); ++it) {
-		if (ColorsMatch(color, *it, tolerance)) {
+	for (int x = 0; x < width; x++) {
+		totalCount += 2;
+		if (_ColorsMatch(_GetPixelColor(bitmap, x, 0), color, tolerance))
 			matchCount++;
-		}
+		if (_ColorsMatch(_GetPixelColor(bitmap, x, height-1), color, tolerance))
+			matchCount++;
 	}
 
-	return static_cast<double>(matchCount) / edgeColors.size();
+	for (int y = 1; y < height-1; y++) {
+		totalCount += 2;
+		if (_ColorsMatch(_GetPixelColor(bitmap, 0, y), color, tolerance))
+			matchCount++;
+		if (_ColorsMatch(_GetPixelColor(bitmap, width-1, y), color, tolerance))
+			matchCount++;
+	}
+
+	return totalCount > 0 ? static_cast<double>(matchCount) / totalCount : 0.0;
 }
 
 double
-BackgroundRemover::CalculateConnectivityScore(const BitmapData& bitmap, const ColorKey& color, int tolerance) const
+BackgroundRemover::_CalculateConnectivityScore(const BitmapData& bitmap, const ColorKey& color, int tolerance) const
 {
 	int width = bitmap.Width();
 	int height = bitmap.Height();
@@ -371,15 +246,10 @@ BackgroundRemover::CalculateConnectivityScore(const BitmapData& bitmap, const Co
 	for (int y = 0; y < height; y++) {
 		for (int x = 0; x < width; x++) {
 			if (!visited[y][x]) {
-				ColorKey currentColor = {
-					bitmap.GetPixelComponent(x, y, 0),
-					bitmap.GetPixelComponent(x, y, 1),
-					bitmap.GetPixelComponent(x, y, 2),
-					bitmap.GetPixelComponent(x, y, 3)
-				};
+				ColorKey currentColor = _GetPixelColor(bitmap, x, y);
 
-				if (ColorsMatch(currentColor, color, tolerance)) {
-					int area = FloodFillCount(bitmap, x, y, color, tolerance, visited);
+				if (_ColorsMatch(currentColor, color, tolerance)) {
+					int area = _FloodFillCount(bitmap, x, y, color, tolerance, visited);
 					maxArea = std::max(maxArea, area);
 				}
 			}
@@ -391,7 +261,7 @@ BackgroundRemover::CalculateConnectivityScore(const BitmapData& bitmap, const Co
 }
 
 BitmapData
-BackgroundRemover::ApplyBackgroundRemoval(const BitmapData& bitmap, const ColorKey& backgroundColor, int tolerance) const
+BackgroundRemover::_ApplyBackgroundRemoval(const BitmapData& bitmap, const ColorKey& backgroundColor, int tolerance) const
 {
 	int width = bitmap.Width();
 	int height = bitmap.Height();
@@ -402,32 +272,32 @@ BackgroundRemover::ApplyBackgroundRemoval(const BitmapData& bitmap, const ColorK
 
 	for (int x = 0; x < width; x++) {
 		if (!visited[0][x]) {
-			ColorKey color = GetPixelColor(bitmap, x, 0);
-			if (ColorsMatch(color, backgroundColor, tolerance)) {
-				FloodFillMark(bitmap, x, 0, backgroundColor, tolerance, visited, toRemove);
+			ColorKey color = _GetPixelColor(bitmap, x, 0);
+			if (_ColorsMatch(color, backgroundColor, tolerance)) {
+				_FloodFillMark(bitmap, x, 0, backgroundColor, tolerance, visited, toRemove);
 			}
 		}
 
 		if (!visited[height-1][x]) {
-			ColorKey color = GetPixelColor(bitmap, x, height-1);
-			if (ColorsMatch(color, backgroundColor, tolerance)) {
-				FloodFillMark(bitmap, x, height-1, backgroundColor, tolerance, visited, toRemove);
+			ColorKey color = _GetPixelColor(bitmap, x, height-1);
+			if (_ColorsMatch(color, backgroundColor, tolerance)) {
+				_FloodFillMark(bitmap, x, height-1, backgroundColor, tolerance, visited, toRemove);
 			}
 		}
 	}
 
 	for (int y = 1; y < height-1; y++) {
 		if (!visited[y][0]) {
-			ColorKey color = GetPixelColor(bitmap, 0, y);
-			if (ColorsMatch(color, backgroundColor, tolerance)) {
-				FloodFillMark(bitmap, 0, y, backgroundColor, tolerance, visited, toRemove);
+			ColorKey color = _GetPixelColor(bitmap, 0, y);
+			if (_ColorsMatch(color, backgroundColor, tolerance)) {
+				_FloodFillMark(bitmap, 0, y, backgroundColor, tolerance, visited, toRemove);
 			}
 		}
 
 		if (!visited[y][width-1]) {
-			ColorKey color = GetPixelColor(bitmap, width-1, y);
-			if (ColorsMatch(color, backgroundColor, tolerance)) {
-				FloodFillMark(bitmap, width-1, y, backgroundColor, tolerance, visited, toRemove);
+			ColorKey color = _GetPixelColor(bitmap, width-1, y);
+			if (_ColorsMatch(color, backgroundColor, tolerance)) {
+				_FloodFillMark(bitmap, width-1, y, backgroundColor, tolerance, visited, toRemove);
 			}
 		}
 	}
@@ -436,7 +306,7 @@ BackgroundRemover::ApplyBackgroundRemoval(const BitmapData& bitmap, const ColorK
 		for (int x = 0; x < width; x++) {
 			if (toRemove[y][x]) {
 				int index = (y * width + x) * 4;
-				newData[index + 3] = 0; // Set transparent pixel
+				newData[index + 3] = 0;
 			}
 		}
 	}
@@ -444,66 +314,8 @@ BackgroundRemover::ApplyBackgroundRemoval(const BitmapData& bitmap, const ColorK
 	return BitmapData(width, height, newData);
 }
 
-std::map<ColorKey, int>
-BackgroundRemover::GetColorHistogram(const BitmapData& bitmap) const
-{
-	std::map<ColorKey, int> histogram;
-
-	for (int y = 0; y < bitmap.Height(); y++) {
-		for (int x = 0; x < bitmap.Width(); x++) {
-			ColorKey color = {
-				bitmap.GetPixelComponent(x, y, 0),
-				bitmap.GetPixelComponent(x, y, 1),
-				bitmap.GetPixelComponent(x, y, 2),
-				bitmap.GetPixelComponent(x, y, 3)
-			};
-			histogram[color]++;
-		}
-	}
-
-	return histogram;
-}
-
-std::vector<BackgroundCandidate>
-BackgroundRemover::ClusterSimilarColors(const std::map<ColorKey, int>& histogram, int tolerance) const
-{
-	std::vector<BackgroundCandidate> clusters;
-	std::vector<std::pair<ColorKey, int> > colorList;
-
-	for (std::map<ColorKey, int>::const_iterator it = histogram.begin(); it != histogram.end(); ++it) {
-		colorList.push_back(*it);
-	}
-
-	ColorFrequencyComparator comparator;
-	std::sort(colorList.begin(), colorList.end(), comparator);
-
-	std::vector<bool> processed(colorList.size(), false);
-
-	for (int i = 0; i < static_cast<int>(colorList.size()); i++) {
-		if (processed[i]) continue;
-
-		BackgroundCandidate cluster;
-		cluster.color = colorList[i].first;
-		cluster.frequency = colorList[i].second;
-
-		for (int j = i + 1; j < static_cast<int>(colorList.size()); j++) {
-			if (!processed[j] && ColorsMatch(colorList[i].first, colorList[j].first, tolerance)) {
-				cluster.frequency += colorList[j].second;
-				processed[j] = true;
-			}
-		}
-
-		processed[i] = true;
-		clusters.push_back(cluster);
-
-		if (clusters.size() >= 10) break;
-	}
-
-	return clusters;
-}
-
 ColorKey
-BackgroundRemover::GetPixelColor(const BitmapData& bitmap, int x, int y) const
+BackgroundRemover::_GetPixelColor(const BitmapData& bitmap, int x, int y) const
 {
 	ColorKey color = {
 		bitmap.GetPixelComponent(x, y, 0),
@@ -515,7 +327,7 @@ BackgroundRemover::GetPixelColor(const BitmapData& bitmap, int x, int y) const
 }
 
 void
-BackgroundRemover::FloodFillMark(const BitmapData& bitmap, int startX, int startY,
+BackgroundRemover::_FloodFillMark(const BitmapData& bitmap, int startX, int startY,
 								const ColorKey& targetColor, int tolerance,
 								std::vector<std::vector<bool> >& visited,
 								std::vector<std::vector<bool> >& toRemove) const
@@ -535,9 +347,9 @@ BackgroundRemover::FloodFillMark(const BitmapData& bitmap, int startX, int start
 		if (x < 0 || x >= width || y < 0 || y >= height || visited[y][x])
 			continue;
 
-		ColorKey currentColor = GetPixelColor(bitmap, x, y);
+		ColorKey currentColor = _GetPixelColor(bitmap, x, y);
 
-		if (!ColorsMatch(currentColor, targetColor, tolerance))
+		if (!_ColorsMatch(currentColor, targetColor, tolerance))
 			continue;
 
 		visited[y][x] = true;

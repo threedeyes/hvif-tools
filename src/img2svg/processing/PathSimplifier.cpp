@@ -9,10 +9,7 @@
 
 #include "PathSimplifier.h"
 #include "PathTracer.h"
-
-#ifndef M_PI
-#define M_PI 3.14159265358979323846
-#endif
+#include "SharedEdgeRegistry.h"
 
 PathSimplifier::PathSimplifier()
 {
@@ -40,8 +37,8 @@ PathSimplifier::_PerpendicularDistance(const std::vector<double>& point,
 	return fabs((point[0] - lineStart[0]) * deltaY - (point[1] - lineStart[1]) * deltaX) / normalLength;
 }
 
-std::vector<std::vector<double>>
-PathSimplifier::DouglasPeuckerSimple(const std::vector<std::vector<double>>& path, float tolerance)
+std::vector<std::vector<double> >
+PathSimplifier::DouglasPeuckerSimple(const std::vector<std::vector<double> >& path, float tolerance)
 {
 	if (path.size() <= 2)
 		return path;
@@ -58,21 +55,18 @@ PathSimplifier::DouglasPeuckerSimple(const std::vector<std::vector<double>>& pat
 		}
 	}
 
-	std::vector<std::vector<double>> result;
+	std::vector<std::vector<double> > result;
 
 	if (maxDistance > tolerance) {
-		// Recursively simplify both parts
-		std::vector<std::vector<double>> firstPart(path.begin(), path.begin() + index + 1);
-		std::vector<std::vector<double>> firstResult = DouglasPeuckerSimple(firstPart, tolerance);
+		std::vector<std::vector<double> > firstPart(path.begin(), path.begin() + index + 1);
+		std::vector<std::vector<double> > firstResult = DouglasPeuckerSimple(firstPart, tolerance);
 
-		std::vector<std::vector<double>> secondPart(path.begin() + index, path.end());
-		std::vector<std::vector<double>> secondResult = DouglasPeuckerSimple(secondPart, tolerance);
+		std::vector<std::vector<double> > secondPart(path.begin() + index, path.end());
+		std::vector<std::vector<double> > secondResult = DouglasPeuckerSimple(secondPart, tolerance);
 
-		// Combine results (avoid duplicating the middle point)
 		result.insert(result.end(), firstResult.begin(), firstResult.end() - 1);
 		result.insert(result.end(), secondResult.begin(), secondResult.end());
 	} else {
-		// All points are close to the line, return just endpoints
 		result.push_back(path[0]);
 		result.push_back(path[path.size() - 1]);
 	}
@@ -107,8 +101,8 @@ PathSimplifier::_CalculateCurvature(const std::vector<double>& prev,
 	return acos(dotProduct);
 }
 
-std::vector<std::vector<double>>
-PathSimplifier::DouglasPeuckerWithProtection(const std::vector<std::vector<double>>& path,
+std::vector<std::vector<double> >
+PathSimplifier::DouglasPeuckerWithProtection(const std::vector<std::vector<double> >& path,
 											float tolerance,
 											const std::vector<bool>& protectedPoints)
 {
@@ -116,7 +110,6 @@ PathSimplifier::DouglasPeuckerWithProtection(const std::vector<std::vector<doubl
 		return DouglasPeuckerSimple(path, tolerance);
 	}
 
-	// Find segments between protected points
 	std::vector<int> segments;
 	segments.push_back(0);
 
@@ -128,7 +121,7 @@ PathSimplifier::DouglasPeuckerWithProtection(const std::vector<std::vector<doubl
 	segments.push_back(path.size() - 1);
 
 	// Simplify each segment separately
-	std::vector<std::vector<double>> result;
+	std::vector<std::vector<double> > result;
 
 	for (int i = 0; i < static_cast<int>(segments.size()) - 1; i++) {
 		int start = segments[i];
@@ -142,13 +135,9 @@ PathSimplifier::DouglasPeuckerWithProtection(const std::vector<std::vector<doubl
 			continue;
 		}
 
-		// Extract segment
-		std::vector<std::vector<double>> segment(path.begin() + start, path.begin() + end + 1);
+		std::vector<std::vector<double> > segment(path.begin() + start, path.begin() + end + 1);
+		std::vector<std::vector<double> > simplified = DouglasPeuckerSimple(segment, tolerance);
 
-		// Simplify segment
-		std::vector<std::vector<double>> simplified = DouglasPeuckerSimple(segment, tolerance);
-
-		// Add to result (avoid duplicates)
 		for (int j = 0; j < static_cast<int>(simplified.size()); j++) {
 			if (result.empty() || 
 				(result.back()[0] != simplified[j][0] || result.back()[1] != simplified[j][1])) {
@@ -160,8 +149,8 @@ PathSimplifier::DouglasPeuckerWithProtection(const std::vector<std::vector<doubl
 	return result;
 }
 
-std::vector<std::vector<double>>
-PathSimplifier::DouglasPeucker(const std::vector<std::vector<double>>& path,
+std::vector<std::vector<double> >
+PathSimplifier::DouglasPeucker(const std::vector<std::vector<double> >& path,
 							float tolerance,
 							bool curveProtection,
 							float curvatureThreshold)
@@ -187,22 +176,21 @@ PathSimplifier::DouglasPeucker(const std::vector<std::vector<double>>& path,
 	return DouglasPeuckerWithProtection(path, tolerance, protectedPoints);
 }
 
-std::vector<std::vector<std::vector<std::vector<double>>>>
-PathSimplifier::BatchLayerDouglasPeucker(const std::vector<std::vector<std::vector<std::vector<double>>>>& layers,
+std::vector<std::vector<std::vector<std::vector<double> > > >
+PathSimplifier::BatchLayerDouglasPeucker(const std::vector<std::vector<std::vector<std::vector<double> > > >& layers,
 										const TracingOptions& options)
 {
-	std::vector<std::vector<std::vector<std::vector<double>>>> simplifiedLayers;
+	std::vector<std::vector<std::vector<std::vector<double> > > > simplifiedLayers;
 
 	float tolerance = options.fDouglasPeuckerTolerance;
 	bool curveProtection = (options.fDouglasPeuckerCurveProtection > 0.5f);
 	float curvatureThreshold = 0.1f + (options.fDouglasPeuckerCurveProtection * 0.9f);
 
 	for (int k = 0; k < static_cast<int>(layers.size()); k++) {
-		std::vector<std::vector<std::vector<double>>> layerPaths;
+		std::vector<std::vector<std::vector<double> > > layerPaths;
 
 		for (int i = 0; i < static_cast<int>(layers[k].size()); i++) {
-			// Convert traced segments back to points for simplification
-			std::vector<std::vector<double>> pathPoints;
+			std::vector<std::vector<double> > pathPoints;
 
 			for (int j = 0; j < static_cast<int>(layers[k][i].size()); j++) {
 				const std::vector<double>& segment = layers[k][i][j];
@@ -215,10 +203,10 @@ PathSimplifier::BatchLayerDouglasPeucker(const std::vector<std::vector<std::vect
 					}
 
 					std::vector<double> end(2);
-					if (segment[0] == 1.0) { // linear
+					if (segment[0] == 1.0) {
 						end[0] = segment[3];
 						end[1] = segment[4];
-					} else { // quadratic
+					} else {
 						end[0] = segment[5];
 						end[1] = segment[6];
 					}
@@ -227,29 +215,28 @@ PathSimplifier::BatchLayerDouglasPeucker(const std::vector<std::vector<std::vect
 			}
 
 			if (pathPoints.size() > 2) {
-				std::vector<std::vector<double>> simplified = 
+				std::vector<std::vector<double> > simplified =
 					DouglasPeucker(pathPoints, tolerance, curveProtection, curvatureThreshold);
 
 				if (simplified.size() >= 2) {
-					std::vector<std::vector<double>> tracedSegments;
+					std::vector<std::vector<double> > tracedSegments;
 
 					for (int p = 0; p < static_cast<int>(simplified.size()) - 1; p++) {
 						std::vector<double> segment(7);
 						segment[0] = 1.0; // linear segment
-						segment[1] = simplified[p][0];     // start x
-						segment[2] = simplified[p][1];     // start y
+						segment[1] = simplified[p][0]; // start x
+						segment[2] = simplified[p][1]; // start y
 						segment[3] = simplified[p + 1][0]; // end x
 						segment[4] = simplified[p + 1][1]; // end y
-						segment[5] = 0.0; // control point x (unused for linear)
-						segment[6] = 0.0; // control point y (unused for linear)
+						segment[5] = 0.0; // control point x
+						segment[6] = 0.0; // control point y
 						tracedSegments.push_back(segment);
 					}
 
 					layerPaths.push_back(tracedSegments);
 				}
 			} else if (pathPoints.size() == 2) {
-				// Convert 2 points to a single linear segment
-				std::vector<std::vector<double>> tracedSegments;
+				std::vector<std::vector<double> > tracedSegments;
 				std::vector<double> segment(7);
 				segment[0] = 1.0; // linear
 				segment[1] = pathPoints[0][0]; // start x
@@ -269,13 +256,13 @@ PathSimplifier::BatchLayerDouglasPeucker(const std::vector<std::vector<std::vect
 	return simplifiedLayers;
 }
 
-std::vector<std::vector<double>>
-PathSimplifier::MergeCollinearSegments(const std::vector<std::vector<double>>& path, float tolerance)
+std::vector<std::vector<double> >
+PathSimplifier::MergeCollinearSegments(const std::vector<std::vector<double> >& path, float tolerance)
 {
 	if (path.size() < 3)
 		return path;
 
-	std::vector<std::vector<double>> result;
+	std::vector<std::vector<double> > result;
 	result.push_back(path[0]);
 
 	for (int i = 1; i < static_cast<int>(path.size()) - 1; i++) {
@@ -306,25 +293,23 @@ PathSimplifier::MergeCollinearSegments(const std::vector<std::vector<double>>& p
 	return result;
 }
 
-std::vector<std::vector<double>>
-PathSimplifier::RemoveShortSegments(const std::vector<std::vector<double>>& path, float minLength)
+std::vector<std::vector<double> >
+PathSimplifier::RemoveShortSegments(const std::vector<std::vector<double> >& path, float minLength)
 {
 	if (path.size() < 3)
 		return path;
 
-	std::vector<std::vector<double>> result;
+	std::vector<std::vector<double> > result;
 	result.push_back(path[0]);
 
 	for (int i = 1; i < static_cast<int>(path.size()); i++) {
 		const std::vector<double>& prev = result.back();
 		const std::vector<double>& curr = path[i];
 
-		// Calculate distance from previous point
 		double deltaX = curr[0] - prev[0];
 		double deltaY = curr[1] - prev[1];
 		double distance = sqrt(deltaX * deltaX + deltaY * deltaY);
 
-		// Only add point if segment is long enough
 		if (distance >= minLength || i == static_cast<int>(path.size()) - 1)
 			result.push_back(curr);
 	}
@@ -332,17 +317,16 @@ PathSimplifier::RemoveShortSegments(const std::vector<std::vector<double>>& path
 	return result;
 }
 
-std::vector<std::vector<double>>
-PathSimplifier::SmoothPath(const std::vector<std::vector<double>>& path, float smoothingFactor)
+std::vector<std::vector<double> >
+PathSimplifier::SmoothPath(const std::vector<std::vector<double> >& path, float smoothingFactor)
 {
 	if (path.size() < 3 || smoothingFactor <= 0)
 		return path;
 
-	std::vector<std::vector<double>> result = path;
+	std::vector<std::vector<double> > result = path;
 
-	// Apply simple smoothing by averaging neighboring points
 	for (int iter = 0; iter < static_cast<int>(smoothingFactor * 3); iter++) {
-		std::vector<std::vector<double>> smoothed = result;
+		std::vector<std::vector<double> > smoothed = result;
 
 		for (int i = 1; i < static_cast<int>(result.size()) - 1; i++) {
 			double weight = 0.3f; // Smoothing weight
@@ -358,53 +342,138 @@ PathSimplifier::SmoothPath(const std::vector<std::vector<double>>& path, float s
 	return result;
 }
 
-std::vector<std::vector<double>>
-PathSimplifier::SimplifyPath(const std::vector<std::vector<double>>& path, const TracingOptions& options)
+std::vector<bool>
+PathSimplifier::_ConvertSegmentsToSharedMarks(
+	const std::vector<std::vector<double> >& segments,
+	const std::vector<bool>& sharedSegments)
+{
+	std::vector<bool> result;
+	if (segments.empty()) return result;
+
+	result.push_back(sharedSegments.empty() ? false : sharedSegments[0]);
+
+	for (size_t i = 0; i < segments.size(); i++) {
+		bool isShared = (i < sharedSegments.size()) ? sharedSegments[i] : false;
+		result.push_back(isShared);
+	}
+
+	return result;
+}
+
+std::vector<std::vector<double> >
+PathSimplifier::SimplifyPath(const std::vector<std::vector<double> >& path,
+							  const TracingOptions& options,
+							  const std::vector<bool>* protectedPoints)
 {
 	if (path.size() < 3) {
 		return path;
 	}
 
-	std::vector<std::vector<double>> result = path;
+	std::vector<std::vector<double> > result = path;
 
-	// Step 1: Remove very short segments first
-	if (options.fMinSegmentLength > 0)
-		result = RemoveShortSegments(result, options.fMinSegmentLength);
+	if (options.fMinSegmentLength > 0) {
+		std::vector<std::vector<double> > temp;
+		temp.push_back(result[0]);
 
-	// Step 2: Apply curve smoothing if enabled
-	if (options.fCurveSmoothing > 0)
-		result = SmoothPath(result, options.fCurveSmoothing);
+		for (size_t i = 1; i < result.size(); i++) {
+			bool isProtected = (protectedPoints && i < protectedPoints->size())
+							   ? (*protectedPoints)[i] : false;
 
-	// Step 3: Merge collinear segments
-	if (options.fCollinearTolerance > 0)
-		result = MergeCollinearSegments(result, options.fCollinearTolerance);
+			const std::vector<double>& prev = temp.back();
+			const std::vector<double>& curr = result[i];
 
-	// Step 4: Apply Douglas-Peucker if enabled
-	if (options.fDouglasPeuckerEnabled) {
+			double deltaX = curr[0] - prev[0];
+			double deltaY = curr[1] - prev[1];
+			double distance = sqrt(deltaX * deltaX + deltaY * deltaY);
+
+			if (distance >= options.fMinSegmentLength || isProtected || i == result.size() - 1) {
+				temp.push_back(curr);
+			}
+		}
+		result = temp;
+	}
+
+	if (options.fCurveSmoothing > 0) {
+		std::vector<std::vector<double> > temp = result;
+
+		for (int iter = 0; iter < static_cast<int>(options.fCurveSmoothing * 3); iter++) {
+			std::vector<std::vector<double> > smoothed = temp;
+
+			for (size_t i = 1; i < temp.size() - 1; i++) {
+				bool isProtected = (protectedPoints && i < protectedPoints->size())
+								   ? (*protectedPoints)[i] : false;
+
+				if (isProtected) continue;
+
+				double weight = 0.3f; // Smoothing weight
+				smoothed[i][0] = (1.0f - 2*weight) * temp[i][0] +
+								weight * temp[i-1][0] + weight * temp[i+1][0];
+				smoothed[i][1] = (1.0f - 2*weight) * temp[i][1] +
+								weight * temp[i-1][1] + weight * temp[i+1][1];
+			}
+
+			temp = smoothed;
+		}
+		result = temp;
+	}
+
+	if (options.fCollinearTolerance > 0) {
+		std::vector<std::vector<double> > temp;
+		temp.push_back(result[0]);
+
+		for (size_t i = 1; i < result.size() - 1; i++) {
+			bool isProtected = (protectedPoints && i < protectedPoints->size())
+							   ? (*protectedPoints)[i] : false;
+
+			if (isProtected) {
+				temp.push_back(result[i]);
+				continue;
+			}
+
+			const std::vector<double>& prev = temp.back();
+			const std::vector<double>& curr = result[i];
+			const std::vector<double>& next = result[i + 1];
+
+			double area = fabs((curr[0] - prev[0]) * (next[1] - prev[1]) -
+							  (next[0] - prev[0]) * (curr[1] - prev[1]));
+
+			double baseLength = sqrt((next[0] - prev[0]) * (next[0] - prev[0]) +
+									(next[1] - prev[1]) * (next[1] - prev[1]));
+
+			if (area / std::max(baseLength, 1.0) > options.fCollinearTolerance) {
+				temp.push_back(curr);
+			}
+		}
+
+		if (!result.empty())
+			temp.push_back(result.back());
+
+		result = temp;
+	}
+
+	if (options.fDouglasPeuckerEnabled && protectedPoints) {
 		bool curveProtection = (options.fDouglasPeuckerCurveProtection > 0.5f);
 		float curvatureThreshold = 0.1f + (options.fDouglasPeuckerCurveProtection * 0.9f);
 		float tolerance = options.fDouglasPeuckerTolerance;
 
-		// Increase tolerance for aggressive simplification
 		if (options.fAggressiveSimplification) {
 			tolerance *= 1.5f;
 		}
 
-		result = DouglasPeucker(result, tolerance, curveProtection, curvatureThreshold);
+		result = DouglasPeuckerWithProtection(result, tolerance, *protectedPoints);
 	}
 
 	return result;
 }
 
 ObjectMetrics
-PathSimplifier::CalculateObjectMetrics(const std::vector<std::vector<double>>& path)
+PathSimplifier::CalculateObjectMetrics(const std::vector<std::vector<double> >& path)
 {
 	ObjectMetrics metrics;
 
 	if (path.size() < 3)
 		return metrics;
 
-	// Calculate bounding box
 	if (!path.empty()) {
 		metrics.boundingBox.minX = metrics.boundingBox.maxX = path[0][0];
 		metrics.boundingBox.minY = metrics.boundingBox.maxY = path[0][1];
@@ -429,7 +498,7 @@ PathSimplifier::CalculateObjectMetrics(const std::vector<std::vector<double>>& p
 }
 
 double
-PathSimplifier::_CalculatePathArea(const std::vector<std::vector<double>>& path)
+PathSimplifier::_CalculatePathArea(const std::vector<std::vector<double> >& path)
 {
 	if (path.size() < 3)
 		return 0.0;
@@ -450,7 +519,7 @@ PathSimplifier::_CalculatePathArea(const std::vector<std::vector<double>>& path)
 }
 
 double
-PathSimplifier::_CalculatePathPerimeter(const std::vector<std::vector<double>>& path)
+PathSimplifier::_CalculatePathPerimeter(const std::vector<std::vector<double> >& path)
 {
 	if (path.size() < 2)
 		return 0.0;
@@ -476,31 +545,28 @@ PathSimplifier::IsObjectTooSmall(const ObjectMetrics& metrics, const TracingOpti
 	if (!options.fFilterSmallObjects)
 		return false;
 	
-	// Check area threshold
 	if (metrics.area < options.fMinObjectArea)
 		return true;
 
-	// Check bounding box dimensions
 	if (metrics.boundingBox.width < options.fMinObjectWidth ||
 		metrics.boundingBox.height < options.fMinObjectHeight) {
 		return true;
 	}
 
-	// Check perimeter threshold
 	if (metrics.perimeter < options.fMinObjectPerimeter)
 		return true;
 
 	return false;
 }
 
-std::vector<std::vector<std::vector<double>>>
-PathSimplifier::FilterSmallObjects(const std::vector<std::vector<std::vector<double>>>& paths,
+std::vector<std::vector<std::vector<double> > >
+PathSimplifier::FilterSmallObjects(const std::vector<std::vector<std::vector<double> > >& paths,
 								const TracingOptions& options)
 {
 	if (!options.fFilterSmallObjects)
 		return paths;
 
-	std::vector<std::vector<std::vector<double>>> filteredPaths;
+	std::vector<std::vector<std::vector<double> > > filteredPaths;
 	int removedCount = 0;
 
 	for (int i = 0; i < static_cast<int>(paths.size()); i++) {
@@ -508,13 +574,11 @@ PathSimplifier::FilterSmallObjects(const std::vector<std::vector<std::vector<dou
 			continue;
 		}
 
-		// Convert traced segments back to points for analysis
-		std::vector<std::vector<double>> pathPoints;
+		std::vector<std::vector<double> > pathPoints;
 		
 		for (int j = 0; j < static_cast<int>(paths[i].size()); j++) {
 			const std::vector<double>& segment = paths[i][j];
 			if (segment.size() >= 4) {
-				// Add start point of first segment
 				if (pathPoints.empty()) {
 					std::vector<double> start(2);
 					start[0] = segment[1];
@@ -522,12 +586,11 @@ PathSimplifier::FilterSmallObjects(const std::vector<std::vector<std::vector<dou
 					pathPoints.push_back(start);
 				}
 
-				// Add end point
 				std::vector<double> end(2);
-				if (segment[0] == 1.0) { // linear
+				if (segment[0] == 1.0) {
 					end[0] = segment[3];
 					end[1] = segment[4];
-				} else { // quadratic
+				} else {
 					end[0] = segment[5];
 					end[1] = segment[6];
 				}
@@ -537,13 +600,11 @@ PathSimplifier::FilterSmallObjects(const std::vector<std::vector<std::vector<dou
 
 		if (pathPoints.size() < 3) {
 			removedCount++;
-			continue; // Too few points
+			continue;
 		}
 
-		// Calculate object metrics
 		ObjectMetrics metrics = CalculateObjectMetrics(pathPoints);
 
-		// Filter based on metrics
 		if (!IsObjectTooSmall(metrics, options)) {
 			filteredPaths.push_back(paths[i]);
 		} else {
@@ -551,18 +612,14 @@ PathSimplifier::FilterSmallObjects(const std::vector<std::vector<std::vector<dou
 		}
 	}
 
-/*	if (removedCount > 0) {
-		std::cout << "  Filtered out " << removedCount << " small objects" << std::endl;
-	} */
-
 	return filteredPaths;
 }
 
-std::vector<std::vector<std::vector<std::vector<double>>>>
-PathSimplifier::BatchFilterSmallObjects(const std::vector<std::vector<std::vector<std::vector<double>>>>& layers,
+std::vector<std::vector<std::vector<std::vector<double> > > >
+PathSimplifier::BatchFilterSmallObjects(const std::vector<std::vector<std::vector<std::vector<double> > > >& layers,
 										const TracingOptions& options)
 {
-	std::vector<std::vector<std::vector<std::vector<double>>>> filteredLayers;
+	std::vector<std::vector<std::vector<std::vector<double> > > > filteredLayers;
 
 	for (int k = 0; k < static_cast<int>(layers.size()); k++) {
 		filteredLayers.push_back(FilterSmallObjects(layers[k], options));
@@ -571,18 +628,24 @@ PathSimplifier::BatchFilterSmallObjects(const std::vector<std::vector<std::vecto
 	return filteredLayers;
 }
 
-std::vector<std::vector<std::vector<std::vector<double>>>>
-PathSimplifier::BatchTracePathsWithSimplification(const std::vector<std::vector<std::vector<std::vector<double>>>>& layers,
-												const TracingOptions& options)
+std::vector<std::vector<std::vector<std::vector<double> > > >
+PathSimplifier::BatchTracePathsWithSimplification(
+	const std::vector<std::vector<std::vector<std::vector<double> > > >& layers,
+	const TracingOptions& options,
+	const SharedEdgeRegistry* registry)
 {
-	std::vector<std::vector<std::vector<std::vector<double>>>> simplifiedLayers;
+	std::vector<std::vector<std::vector<std::vector<double> > > > simplifiedLayers;
 
 	for (int k = 0; k < static_cast<int>(layers.size()); k++) {
-		std::vector<std::vector<std::vector<double>>> layerPaths;
+		std::vector<std::vector<std::vector<double> > > layerPaths;
 
 		for (int i = 0; i < static_cast<int>(layers[k].size()); i++) {
-			// Convert traced segments back to points for simplification
-			std::vector<std::vector<double>> pathPoints;
+			std::vector<bool> sharedSegs;
+			if (registry) {
+				registry->GetSharedSegmentMask(k, i, sharedSegs);
+			}
+
+			std::vector<std::vector<double> > pathPoints;
 
 			for (int j = 0; j < static_cast<int>(layers[k][i].size()); j++) {
 				const std::vector<double>& segment = layers[k][i][j];
@@ -595,10 +658,10 @@ PathSimplifier::BatchTracePathsWithSimplification(const std::vector<std::vector<
 					}
 
 					std::vector<double> end(2);
-					if (segment[0] == 1.0) { // linear
+					if (segment[0] == 1.0) {
 						end[0] = segment[3];
 						end[1] = segment[4];
-					} else { // quadratic
+					} else {
 						end[0] = segment[5];
 						end[1] = segment[6];
 					}
@@ -607,15 +670,16 @@ PathSimplifier::BatchTracePathsWithSimplification(const std::vector<std::vector<
 			}
 
 			if (pathPoints.size() >= 2) {
-				// Apply advanced simplification
-				std::vector<std::vector<double>> simplified = SimplifyPath(pathPoints, options);
+				std::vector<bool> protectedPoints =
+					_ConvertSegmentsToSharedMarks(layers[k][i], sharedSegs);
 
-				// Convert back to traced segments
+				std::vector<std::vector<double> > simplified =
+					SimplifyPath(pathPoints, options, &protectedPoints);
+
 				if (simplified.size() >= 2) {
 					PathTracer tracer;
-					std::vector<std::vector<double>> tracedPath = tracer.TracePath(simplified,
-																				 options.fLineThreshold,
-																				 options.fQuadraticThreshold);
+					std::vector<std::vector<double> > tracedPath = tracer.TracePath(simplified,
+										options.fLineThreshold,	options.fQuadraticThreshold);
 					layerPaths.push_back(tracedPath);
 				}
 			}

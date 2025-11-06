@@ -8,6 +8,7 @@
 #include <algorithm>
 
 #include "GradientDetector.h"
+#include "MathUtils.h"
 
 static inline double sqr(double v) { return v * v; }
 
@@ -17,7 +18,7 @@ GradientDetector::~GradientDetector() {}
 double
 GradientDetector::_Luma(unsigned char r, unsigned char g, unsigned char b)
 {
-	return 0.2126 * (double)r + 0.7152 * (double)g + 0.0722 * (double)b;
+	return MathUtils::LumaD((double)r, (double)g, (double)b);
 }
 
 void
@@ -36,41 +37,8 @@ GradientDetector::_L2rgb(const unsigned char a[3], const unsigned char b[3])
 	return std::sqrt(dr*dr + dg*dg + db*db);
 }
 
-bool
-GradientDetector::_Solve3x3(double M[3][3], double B[3], double X[3])
-{
-	int i, j, k;
-	double A[3][4];
-	for (i = 0; i < 3; i++) {
-		for (j = 0; j < 3; j++) A[i][j] = M[i][j];
-		A[i][3] = B[i];
-	}
-	for (i = 0; i < 3; i++) {
-		int piv = i;
-		double maxabs = std::fabs(A[i][i]);
-		for (k = i + 1; k < 3; k++) {
-			double v = std::fabs(A[k][i]);
-			if (v > maxabs) { maxabs = v; piv = k; }
-		}
-		if (maxabs < 1e-12) return false;
-		if (piv != i) {
-			for (j = i; j < 4; j++) {
-				double tmp = A[i][j]; A[i][j] = A[piv][j]; A[piv][j] = tmp;
-			}
-		}
-		double diag = A[i][i];
-		for (j = i; j < 4; j++) A[i][j] /= diag;
-		for (k = 0; k < 3; k++) if (k != i) {
-			double f = A[k][i];
-			for (j = i; j < 4; j++) A[k][j] -= f * A[i][j];
-		}
-	}
-	for (i = 0; i < 3; i++) X[i] = A[i][3];
-	return true;
-}
-
 void
-GradientDetector::_Bounds(const std::vector<std::vector<double>>& pts,
+GradientDetector::_Bounds(const std::vector<std::vector<double> >& pts,
 						  double& minX, double& minY, double& maxX, double& maxY)
 {
 	if (pts.empty()) { minX = minY = maxX = maxY = 0; return; }
@@ -86,7 +54,7 @@ GradientDetector::_Bounds(const std::vector<std::vector<double>>& pts,
 
 bool
 GradientDetector::_PointInPolygon(double x, double y,
-								  const std::vector<std::vector<double>>& poly)
+								  const std::vector<std::vector<double> >& poly)
 {
 	bool inside = false;
 	size_t n = poly.size();
@@ -104,8 +72,8 @@ GradientDetector::_PointInPolygon(double x, double y,
 }
 
 void
-GradientDetector::_FlattenPath(const std::vector<std::vector<double>>& segments,
-							   std::vector<std::vector<double>>& outPoints,
+GradientDetector::_FlattenPath(const std::vector<std::vector<double> >& segments,
+							   std::vector<std::vector<double> >& outPoints,
 							   int maxSubdiv)
 {
 	outPoints.clear();
@@ -149,169 +117,524 @@ GradientDetector::_FlattenPath(const std::vector<std::vector<double>>& segments,
 	}
 }
 
+double
+GradientDetector::_PointSegmentDistance(double px, double py, double x1, double y1, double x2, double y2)
+{
+	double vx = x2 - x1;
+	double vy = y2 - y1;
+	double wx = px - x1;
+	double wy = py - y1;
+
+	double vv = vx*vx + vy*vy;
+	if (vv <= 1e-12) {
+		double dx = px - x1;
+		double dy = py - y1;
+		return std::sqrt(dx*dx + dy*dy);
+	}
+	double t = (wx*vx + wy*vy) / vv;
+	if (t < 0.0) t = 0.0;
+	else if (t > 1.0) t = 1.0;
+	double cx = x1 + t * vx;
+	double cy = y1 + t * vy;
+	double dx = px - cx;
+	double dy = py - cy;
+	return std::sqrt(dx*dx + dy*dy);
+}
+
+double
+GradientDetector::_DistanceToPolygon(double px, double py, const std::vector<std::vector<double> >& poly)
+{
+	if (poly.size() < 2) return 0.0;
+	double best = DBL_MAX;
+	for (size_t i = 0, j = 1; j < poly.size(); i = j, j++) {
+		double d = _PointSegmentDistance(px, py, poly[i][0], poly[i][1], poly[j][0], poly[j][1]);
+		if (d < best) best = d;
+	}
+	return best;
+}
+
+double
+GradientDetector::_ComputeVariance(const std::vector<double>& vals, const std::vector<double>& weights)
+{
+	if (vals.empty()) return 0.0;
+
+	double sumW = 0.0, sumVal = 0.0;
+	for (size_t i = 0; i < vals.size(); i++) {
+		double w = (i < weights.size()) ? weights[i] : 1.0;
+		sumW += w;
+		sumVal += w * vals[i];
+	}
+
+	if (sumW < 1e-12) return 0.0;
+	double mean = sumVal / sumW;
+
+	double variance = 0.0;
+	for (size_t i = 0; i < vals.size(); i++) {
+		double w = (i < weights.size()) ? weights[i] : 1.0;
+		double dev = vals[i] - mean;
+		variance += w * dev * dev;
+	}
+
+	return variance / sumW;
+}
+
+bool
+GradientDetector::_ComputeChannelGradient(const std::vector<double>& vx,
+										  const std::vector<double>& vy,
+										  const std::vector<double>& vw,
+										  const std::vector<double>& vals,
+										  double& outGradX,
+										  double& outGradY,
+										  double& outR2)
+{
+	if (vx.size() < 10) return false;
+
+	double minX = vx[0], maxX = vx[0];
+	double minY = vy[0], maxY = vy[0];
+	for (size_t i = 1; i < vx.size(); i++) {
+		if (vx[i] < minX) minX = vx[i];
+		if (vx[i] > maxX) maxX = vx[i];
+		if (vy[i] < minY) minY = vy[i];
+		if (vy[i] > maxY) maxY = vy[i];
+	}
+	double rangeX = maxX - minX;
+	double rangeY = maxY - minY;
+	if (rangeX < 1e-6) rangeX = 1.0;
+	if (rangeY < 1e-6) rangeY = 1.0;
+
+	std::vector<double> normX(vx.size());
+	std::vector<double> normY(vy.size());
+	for (size_t i = 0; i < vx.size(); i++) {
+		normX[i] = (vx[i] - minX) / rangeX;
+		normY[i] = (vy[i] - minY) / rangeY;
+	}
+
+	double W = 0.0, Wx = 0.0, Wy = 0.0, Wxx = 0.0, Wyy = 0.0, Wxy = 0.0;
+	double Wv = 0.0, Wvx = 0.0, Wvy = 0.0;
+
+	for (size_t i = 0; i < normX.size(); i++) {
+		double w = vw[i];
+		double x = normX[i];
+		double y = normY[i];
+		double v = vals[i];
+
+		W   += w;
+		Wx  += w * x;
+		Wy  += w * y;
+		Wxx += w * x * x;
+		Wyy += w * y * y;
+		Wxy += w * x * y;
+
+		Wv  += w * v;
+		Wvx += w * v * x;
+		Wvy += w * v * y;
+	}
+
+	double M[3][3] = { { W,   Wx,  Wy },
+					   { Wx,  Wxx, Wxy },
+					   { Wy,  Wxy, Wyy } };
+
+	double B[3] = { Wv, Wvx, Wvy };
+	double X[3] = { 0, 0, 0 };
+
+	if (!MathUtils::Solve3x3Normalized(M, B, X))
+		return false;
+
+	outGradX = X[1] / rangeX;
+	outGradY = X[2] / rangeY;
+
+	double mean_v = Wv / W;
+	double ss_tot = 0.0, ss_res = 0.0;
+
+	for (size_t i = 0; i < normX.size(); i++) {
+		double w = vw[i];
+		double predicted = X[0] + X[1] * normX[i] + X[2] * normY[i];
+
+		ss_tot += w * (vals[i] - mean_v) * (vals[i] - mean_v);
+		ss_res += w * (vals[i] - predicted) * (vals[i] - predicted);
+	}
+
+	outR2 = (ss_tot > 1e-12) ? (1.0 - ss_res / ss_tot) : 0.0;
+
+	return true;
+}
+
+bool
+GradientDetector::_ComputeRobustDirection(const std::vector<double>& vx,
+										  const std::vector<double>& vy,
+										  const std::vector<double>& vw,
+										  const std::vector<double>& vr,
+										  const std::vector<double>& vg,
+										  const std::vector<double>& vb,
+										  double& outDirX,
+										  double& outDirY,
+										  double& outConfidence)
+{
+	double gradRx = 0.0, gradRy = 0.0, R2r = 0.0;
+	double gradGx = 0.0, gradGy = 0.0, R2g = 0.0;
+	double gradBx = 0.0, gradBy = 0.0, R2b = 0.0;
+
+	bool okR = _ComputeChannelGradient(vx, vy, vw, vr, gradRx, gradRy, R2r);
+	bool okG = _ComputeChannelGradient(vx, vy, vw, vg, gradGx, gradGy, R2g);
+	bool okB = _ComputeChannelGradient(vx, vy, vw, vb, gradBx, gradBy, R2b);
+
+	if (!okR && !okG && !okB)
+		return false;
+
+	double varR = _ComputeVariance(vr, vw);
+	double varG = _ComputeVariance(vg, vw);
+	double varB = _ComputeVariance(vb, vw);
+
+	double magR = std::sqrt(gradRx * gradRx + gradRy * gradRy);
+	double magG = std::sqrt(gradGx * gradGx + gradGy * gradGy);
+	double magB = std::sqrt(gradBx * gradBx + gradBy * gradBy);
+
+	double reliabilityR = okR ? (R2r * varR * magR) : 0.0;
+	double reliabilityG = okG ? (R2g * varG * magG) : 0.0;
+	double reliabilityB = okB ? (R2b * varB * magB) : 0.0;
+
+	double totalReliability = reliabilityR + reliabilityG + reliabilityB;
+	if (totalReliability < 1e-6)
+		return false;
+
+	double weightR = reliabilityR / totalReliability;
+	double weightG = reliabilityG / totalReliability;
+	double weightB = reliabilityB / totalReliability;
+
+	outDirX = 0.0;
+	outDirY = 0.0;
+
+	std::vector<double> directions[3][2];
+	int validChannels = 0;
+
+	if (okR && magR > 1e-6) {
+		double ux = gradRx / magR;
+		double uy = gradRy / magR;
+		directions[validChannels][0].push_back(ux);
+		directions[validChannels][1].push_back(uy);
+		validChannels++;
+	}
+	if (okG && magG > 1e-6) {
+		double ux = gradGx / magG;
+		double uy = gradGy / magG;
+		directions[validChannels][0].push_back(ux);
+		directions[validChannels][1].push_back(uy);
+		validChannels++;
+	}
+	if (okB && magB > 1e-6) {
+		double ux = gradBx / magB;
+		double uy = gradBy / magB;
+		directions[validChannels][0].push_back(ux);
+		directions[validChannels][1].push_back(uy);
+		validChannels++;
+	}
+
+	if (validChannels >= 2) {
+		double dot01 = directions[0][0][0] * directions[1][0][0] +
+					   directions[0][1][0] * directions[1][1][0];
+		if (dot01 < 0) {
+			directions[1][0][0] = -directions[1][0][0];
+			directions[1][1][0] = -directions[1][1][0];
+		}
+
+		if (validChannels >= 3) {
+			double dot02 = directions[0][0][0] * directions[2][0][0] +
+						   directions[0][1][0] * directions[2][1][0];
+			if (dot02 < 0) {
+				directions[2][0][0] = -directions[2][0][0];
+				directions[2][1][0] = -directions[2][1][0];
+			}
+		}
+	}
+
+	if (okR && magR > 1e-6) {
+		double ux = (validChannels > 0) ? directions[0][0][0] : gradRx / magR;
+		double uy = (validChannels > 0) ? directions[0][1][0] : gradRy / magR;
+		outDirX += weightR * ux;
+		outDirY += weightR * uy;
+	}
+	if (okG && magG > 1e-6) {
+		double ux = (validChannels > 1) ? directions[1][0][0] : gradGx / magG;
+		double uy = (validChannels > 1) ? directions[1][1][0] : gradGy / magG;
+		outDirX += weightG * ux;
+		outDirY += weightG * uy;
+	}
+	if (okB && magB > 1e-6) {
+		double ux = (validChannels > 2) ? directions[2][0][0] : gradBx / magB;
+		double uy = (validChannels > 2) ? directions[2][1][0] : gradBy / magB;
+		outDirX += weightB * ux;
+		outDirY += weightB * uy;
+	}
+
+	double normDir = std::sqrt(outDirX * outDirX + outDirY * outDirY);
+	if (normDir < 1e-8)
+		return false;
+
+	outDirX /= normDir;
+	outDirY /= normDir;
+
+	double consensusScore = 0.0;
+
+	if (okR && magR > 1e-6) {
+		double ux = gradRx / magR;
+		double uy = gradRy / magR;
+		double dot = ux * outDirX + uy * outDirY;
+		consensusScore += std::fabs(dot) * weightR;
+	}
+	if (okG && magG > 1e-6) {
+		double ux = gradGx / magG;
+		double uy = gradGy / magG;
+		double dot = ux * outDirX + uy * outDirY;
+		consensusScore += std::fabs(dot) * weightG;
+	}
+	if (okB && magB > 1e-6) {
+		double ux = gradBx / magB;
+		double uy = gradBy / magB;
+		double dot = ux * outDirX + uy * outDirY;
+		consensusScore += std::fabs(dot) * weightB;
+	}
+
+	double avgR2 = (weightR * R2r + weightG * R2g + weightB * R2b);
+
+	outConfidence = consensusScore * avgR2;
+
+	if (validChannels < 2 && outConfidence < 0.5)
+		return false;
+
+	return true;
+}
+
 IndexedBitmap::LinearGradient
 GradientDetector::_DetectForPath(int layerIndex,
-								 const std::vector<std::vector<double>>& segments,
+								 const std::vector<std::vector<double> >& segments,
 								 const IndexedBitmap& indexed,
 								 const BitmapData& src,
 								 const TracingOptions& options)
 {
 	IndexedBitmap::LinearGradient result;
 
-	std::vector<std::vector<double>> poly;
+	std::vector<std::vector<double> > poly;
 	_FlattenPath(segments, poly, options.fGradientMaxSubdiv);
 	if (poly.size() < 4) return result;
 
 	double minX, minY, maxX, maxY;
 	_Bounds(poly, minX, minY, maxX, maxY);
-	if ((maxX - minX) < options.fGradientMinSize && (maxY - minY) < options.fGradientMinSize)
-		return result;
 
-	int stride = options.fGradientSampleStride;
-	if (stride < 1) stride = 1;
+	double regionSize = std::max(maxX - minX, maxY - minY);
+	double minSizeThreshold = MathUtils::AdaptiveThreshold(indexed.Palette().size(), options.fGradientMinSize);
+
+	if (regionSize < minSizeThreshold)
+		return result;
 
 	int xs = (int)std::floor(minX); if (xs < 0) xs = 0;
 	int ys = (int)std::floor(minY); if (ys < 0) ys = 0;
 	int xe = (int)std::ceil(maxX);  if (xe > src.Width()-1) xe = src.Width()-1;
 	int ye = (int)std::ceil(maxY);  if (ye > src.Height()-1) ye = src.Height()-1;
 
-	std::vector<double> vx, vy, vl;
-	std::vector<unsigned char> vr, vg, vb, va;
+	double regionArea = (maxX - minX) * (maxY - minY);
+	int adaptiveStride = options.fGradientSampleStride;
+	if (regionArea > 10000) {
+		adaptiveStride = 3;
+	} else if (regionArea > 2500) {
+		adaptiveStride = 2;
+	} else {
+		adaptiveStride = 1;
+	}
 
-	for (int y = ys; y <= ye; y += stride) {
-		for (int x = xs; x <= xe; x += stride) {
-			if (!_PointInPolygon((double)x + 0.5, (double)y + 0.5, poly))
+	std::vector<double> vx, vy, vw;
+	std::vector<double> vr, vg, vb, va;
+
+	for (int y = ys; y <= ye; y += adaptiveStride) {
+		for (int x = xs; x <= xe; x += adaptiveStride) {
+			double px = (double)x + 0.5;
+			double py = (double)y + 0.5;
+
+			if (!_PointInPolygon(px, py, poly))
 				continue;
-			// Account for 1-pixel border in indexed array
-			if (y + 1 < 0 || y + 1 >= (int)indexed.Array().size()) continue;
-			if (x + 1 < 0 || x + 1 >= (int)indexed.Array()[0].size()) continue;
-			if (indexed.Array()[y + 1][x + 1] != layerIndex) continue;
 
-			unsigned char r = src.GetPixelComponent(x, y, 0);
-			unsigned char g = src.GetPixelComponent(x, y, 1);
-			unsigned char b = src.GetPixelComponent(x, y, 2);
-			unsigned char a = src.GetPixelComponent(x, y, 3);
-			if (a == 0) continue;
+			unsigned char r8 = src.GetPixelComponent(x, y, 0);
+			unsigned char g8 = src.GetPixelComponent(x, y, 1);
+			unsigned char b8 = src.GetPixelComponent(x, y, 2);
+			unsigned char a8 = src.GetPixelComponent(x, y, 3);
+
+			if (MathUtils::IsTransparent(a8))
+				continue;
+
+			double dist = _DistanceToPolygon(px, py, poly);
+			double wBorder = dist / 3.0;
+			if (wBorder > 1.0) wBorder = 1.0;
+			if (wBorder < 0.1) wBorder = 0.1;
+			double wAlpha = (double)a8 / 255.0;
+			double w = wBorder * wBorder * wAlpha;
+
+			double r = (double)r8;
+			double g = (double)g8;
+			double b = (double)b8;
+			double a = (double)a8;
+
+			if (options.fGradientUseLinearRGB) {
+				r = MathUtils::SRGBToLinear(r);
+				g = MathUtils::SRGBToLinear(g);
+				b = MathUtils::SRGBToLinear(b);
+			}
 
 			vx.push_back((double)x);
 			vy.push_back((double)y);
-			vl.push_back(_Luma(r,g,b));
-			vr.push_back(r); vg.push_back(g); vb.push_back(b); va.push_back(a);
+			vw.push_back(w);
+			vr.push_back(r);
+			vg.push_back(g);
+			vb.push_back(b);
+			va.push_back(a);
 		}
 	}
 
-	if ((int)vx.size() < options.fGradientMinSamples)
+	int minSamples = options.fGradientMinSamples;
+	if ((int)vx.size() < minSamples)
 		return result;
 
-	// Linear regression on luminance: s ≈ A + Bx x + By y
-	double N = (double)vx.size();
-	double Sx=0, Sy=0, Sxx=0, Syy=0, Sxy=0, Ss=0, Ssx=0, Ssy=0;
+	double dirX = 0.0, dirY = 0.0, confidence = 0.0;
+	if (!_ComputeRobustDirection(vx, vy, vw, vr, vg, vb, dirX, dirY, confidence))
+		return result;
+
+	double minConfidence = 0.3;
+	if (confidence < minConfidence)
+		return result;
+
+	std::vector<double> tvals(vx.size());
+	double Wt = 0.0, Wtt = 0.0, W = 0.0;
 	for (size_t i = 0; i < vx.size(); i++) {
-		double x = vx[i], y = vy[i], s = vl[i];
-		Sx += x; Sy += y; Ss += s;
-		Sxx += x*x; Syy += y*y; Sxy += x*y;
-		Ssx += s*x; Ssy += s*y;
+		double t = vx[i] * dirX + vy[i] * dirY;
+		tvals[i] = t;
+		double w = vw[i];
+		W   += w;
+		Wt  += w * t;
+		Wtt += w * t * t;
 	}
-	double M[3][3] = { { N,  Sx,  Sy },
-	                   { Sx, Sxx, Sxy },
-	                   { Sy, Sxy, Syy } };
-	double B[3] = { Ss, Ssx, Ssy };
-	double X[3] = { 0,0,0 };
-	if (!_Solve3x3(M, B, X))
-		return result;
-	double A = X[0], Bx = X[1], By = X[2];
 
-	double norm = std::sqrt(Bx*Bx + By*By);
-	if (norm < 1e-6)
+	double denom = W * Wtt - Wt * Wt;
+	if (std::fabs(denom) < 1e-12)
 		return result;
 
-	double vxn = Bx / norm;
-	double vyn = By / norm;
+	double Wr = 0.0, Wrt = 0.0;
+	double Wg = 0.0, Wgt = 0.0;
+	double Wb = 0.0, Wbt = 0.0;
+	double Wa = 0.0, Wat = 0.0;
 
-	// t projections and per-channel regressions C ≈ a + b t
-	double tmin = DBL_MAX, tmax = -DBL_MAX;
-	double tsum = 0.0, t2sum = 0.0;
-	std::vector<double> tv;
-	tv.resize(vx.size());
 	for (size_t i = 0; i < vx.size(); i++) {
-		double t = vx[i]*vxn + vy[i]*vyn;
-		tv[i] = t;
-		if (t < tmin) tmin = t;
-		if (t > tmax) tmax = t;
-		tsum += t;
-		t2sum += t*t;
+		double w = vw[i];
+		double t = tvals[i];
+		double r = vr[i], g = vg[i], b = vb[i], a = va[i];
+
+		Wr += w * r; Wrt += w * r * t;
+		Wg += w * g; Wgt += w * g * t;
+		Wb += w * b; Wbt += w * b * t;
+		Wa += w * a; Wat += w * a * t;
 	}
-	double denom = N * t2sum - tsum * tsum;
-	if (std::fabs(denom) < 1e-9)
+
+	double br = (W * Wrt - Wt * Wr) / denom;
+	double ar = (Wr - br * Wt) / W;
+
+	double bg = (W * Wgt - Wt * Wg) / denom;
+	double ag = (Wg - bg * Wt) / W;
+
+	double bb = (W * Wbt - Wt * Wb) / denom;
+	double ab = (Wb - bb * Wt) / W;
+
+	double ba = (W * Wat - Wt * Wa) / denom;
+	double aa = (Wa - ba * Wt) / W;
+
+	double mean_r = Wr / W;
+	double mean_g = Wg / W;
+	double mean_b = Wb / W;
+
+	double ss_tot_r = 0.0, ss_res_r = 0.0;
+	double ss_tot_g = 0.0, ss_res_g = 0.0;
+	double ss_tot_b = 0.0, ss_res_b = 0.0;
+
+	for (size_t i = 0; i < vx.size(); i++) {
+		double w = vw[i];
+		double t = tvals[i];
+
+		double pr = ar + br * t;
+		double pg = ag + bg * t;
+		double pb = ab + bb * t;
+
+		ss_tot_r += w * (vr[i] - mean_r) * (vr[i] - mean_r);
+		ss_tot_g += w * (vg[i] - mean_g) * (vg[i] - mean_g);
+		ss_tot_b += w * (vb[i] - mean_b) * (vb[i] - mean_b);
+
+		ss_res_r += w * (vr[i] - pr) * (vr[i] - pr);
+		ss_res_g += w * (vg[i] - pg) * (vg[i] - pg);
+		ss_res_b += w * (vb[i] - pb) * (vb[i] - pb);
+	}
+
+	double R2r = (ss_tot_r <= 1e-12) ? 0.0 : (1.0 - ss_res_r / ss_tot_r);
+	double R2g = (ss_tot_g <= 1e-12) ? 0.0 : (1.0 - ss_res_g / ss_tot_g);
+	double R2b = (ss_tot_b <= 1e-12) ? 0.0 : (1.0 - ss_res_b / ss_tot_b);
+
+	double wsum = 0.0;
+	double R2total = 0.0;
+	if (ss_tot_r > 1e-12) { R2total += R2r * ss_tot_r; wsum += ss_tot_r; }
+	if (ss_tot_g > 1e-12) { R2total += R2g * ss_tot_g; wsum += ss_tot_g; }
+	if (ss_tot_b > 1e-12) { R2total += R2b * ss_tot_b; wsum += ss_tot_b; }
+	if (wsum > 0.0) R2total /= wsum; else R2total = 0.0;
+
+	double minR2Total = (options.fGradientMinR2 > options.fGradientMinR2Total)
+						? options.fGradientMinR2
+						: options.fGradientMinR2Total;
+
+	if (!(R2total >= (double)minR2Total))
 		return result;
 
-	// size along gradient axis
-	if ((tmax - tmin) < options.fGradientMinSize)
+	double tmin_samples = DBL_MAX, tmax_samples = -DBL_MAX;
+	for (size_t i = 0; i < tvals.size(); i++) {
+		if (tvals[i] < tmin_samples) tmin_samples = tvals[i];
+		if (tvals[i] > tmax_samples) tmax_samples = tvals[i];
+	}
+
+	double gradientLength = tmax_samples - tmin_samples;
+	if (gradientLength < minSizeThreshold)
 		return result;
 
-	// R^2 on luminance along t
-	double ss_tot = 0.0;
-	double smean = Ss / N;
-	double ss_res = 0.0;
-	{
-		double cs = 0.0, cst = 0.0;
-		for (size_t i = 0; i < tv.size(); i++) {
-			double s = vl[i];
-			ss_tot += sqr(s - smean);
-			cs += s;
-			cst += s * tv[i];
-		}
-		double bs = (N * cst - tsum * cs) / denom;
-		double as = (cs - bs * tsum) / N;
-		for (size_t i = 0; i < tv.size(); i++) {
-			double s = vl[i];
-			double sh = as + bs * tv[i];
-			ss_res += sqr(s - sh);
-		}
+	double t1c = tmin_samples;
+	double t2c = tmax_samples;
+
+	double r1 = ar + br * t1c, g1 = ag + bg * t1c, b1 = ab + bb * t1c, a1 = aa + ba * t1c;
+	double r2 = ar + br * t2c, g2 = ag + bg * t2c, b2 = ab + bb * t2c, a2 = aa + ba * t2c;
+
+	if (options.fGradientUseLinearRGB) {
+		r1 = MathUtils::LinearToSRGB(r1); g1 = MathUtils::LinearToSRGB(g1);	b1 = MathUtils::LinearToSRGB(b1);
+		r2 = MathUtils::LinearToSRGB(r2); g2 = MathUtils::LinearToSRGB(g2); b2 = MathUtils::LinearToSRGB(b2);
 	}
-	if (ss_tot <= 1e-12) return result;
-	double R2 = 1.0 - ss_res / ss_tot;
-	if (R2 < (double)options.fGradientMinR2)
-		return result;
 
-	double cr=0, cg=0, cb=0, ca=0, crt=0, cgt=0, cbt=0, cat=0;
-	for (size_t i = 0; i < tv.size(); i++) {
-		cr += (double)vr[i]; cg += (double)vg[i]; cb += (double)vb[i]; ca += (double)va[i];
-		crt += (double)vr[i] * tv[i];
-		cgt += (double)vg[i] * tv[i];
-		cbt += (double)vb[i] * tv[i];
-		cat += (double)va[i] * tv[i];
-	}
-	double br = (N * crt - tsum * cr) / denom;
-	double bg = (N * cgt - tsum * cg) / denom;
-	double bb = (N * cbt - tsum * cb) / denom;
-	double ba = (N * cat - tsum * ca) / denom;
-
-	double ar = (cr - br * tsum) / N;
-	double ag = (cg - bg * tsum) / N;
-	double ab = (cb - bb * tsum) / N;
-	double aa = (ca - ba * tsum) / N;
-
-	double r1 = ar + br * tmin, g1 = ag + bg * tmin, b1 = ab + bb * tmin, a1 = aa + ba * tmin;
-	double r2 = ar + br * tmax, g2 = ag + bg * tmax, b2 = ab + bb * tmax, a2 = aa + ba * tmax;
 	_ClampColor(r1); _ClampColor(g1); _ClampColor(b1); _ClampColor(a1);
 	_ClampColor(r2); _ClampColor(g2); _ClampColor(b2); _ClampColor(a2);
 
-	unsigned char cstart[4] = { (unsigned char)(r1+0.5), (unsigned char)(g1+0.5), (unsigned char)(b1+0.5), (unsigned char)(a1+0.5) };
-	unsigned char cend[4]   = { (unsigned char)(r2+0.5), (unsigned char)(g2+0.5), (unsigned char)(b2+0.5), (unsigned char)(a2+0.5) };
+	unsigned char cstart[4] = { (unsigned char)(r1 + 0.5), (unsigned char)(g1 + 0.5), (unsigned char)(b1 + 0.5), (unsigned char)(a1 + 0.5) };
+	unsigned char cend[4]   = { (unsigned char)(r2 + 0.5), (unsigned char)(g2 + 0.5), (unsigned char)(b2 + 0.5), (unsigned char)(a2 + 0.5) };
 
 	unsigned char cstartRGB[3] = { cstart[0], cstart[1], cstart[2] };
 	unsigned char cendRGB[3]   = { cend[0], cend[1], cend[2] };
-	if (_L2rgb(cstartRGB, cendRGB) < (double)options.fGradientMinDelta)
+
+	double minDelta = MathUtils::AdaptiveThreshold(indexed.Palette().size(), options.fGradientMinDelta);
+	if (_L2rgb(cstartRGB, cendRGB) < minDelta)
 		return result;
 
-	double tminBest = DBL_MAX, tmaxBest = -DBL_MAX;
-	double x1=0,y1=0,x2=0,y2=0;
-	for (size_t i = 0; i < vx.size(); i++) {
-		double t = tv[i];
-		if (t < tminBest) { tminBest = t; x1 = vx[i]; y1 = vy[i]; }
-		if (t > tmaxBest) { tmaxBest = t; x2 = vx[i]; y2 = vy[i]; }
+	int tmin_poly_idx = -1, tmax_poly_idx = -1;
+	double tmin_poly = DBL_MAX, tmax_poly = -DBL_MAX;
+	for (size_t i = 0; i < poly.size(); i++) {
+		double t = poly[i][0] * dirX + poly[i][1] * dirY;
+		if (t < tmin_poly) { tmin_poly = t; tmin_poly_idx = (int)i; }
+		if (t > tmax_poly) { tmax_poly = t; tmax_poly_idx = (int)i; }
 	}
+
+	if (tmin_poly_idx < 0 || tmax_poly_idx < 0)
+		return result;
+
+	double x1 = poly[tmin_poly_idx][0];
+	double y1 = poly[tmin_poly_idx][1];
+	double x2 = poly[tmax_poly_idx][0];
+	double y2 = poly[tmax_poly_idx][1];
 
 	result.valid = true;
 	result.x1 = x1; result.y1 = y1;
@@ -322,13 +645,13 @@ GradientDetector::_DetectForPath(int layerIndex,
 	return result;
 }
 
-std::vector<std::vector<IndexedBitmap::LinearGradient>>
+std::vector<std::vector<IndexedBitmap::LinearGradient> >
 GradientDetector::DetectLinearGradients(const IndexedBitmap& indexed,
 										const BitmapData& sourceBitmap,
-										const std::vector<std::vector<std::vector<std::vector<double>>>>& layers,
+										const std::vector<std::vector<std::vector<std::vector<double> > > >& layers,
 										const TracingOptions& options)
 {
-	std::vector<std::vector<IndexedBitmap::LinearGradient>> out;
+	std::vector<std::vector<IndexedBitmap::LinearGradient> > out;
 	out.resize(layers.size());
 	for (size_t k = 0; k < layers.size(); k++) {
 		out[k].resize(layers[k].size());

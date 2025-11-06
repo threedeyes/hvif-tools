@@ -24,30 +24,49 @@ public:
 		}
 	};
 
-							IndexedBitmap();
-							IndexedBitmap(const std::vector<std::vector<int>>& indexArray,
-										const std::vector<std::vector<unsigned char>>& palette);
+	struct PathMetadata {
+		int parentPathIndex;
+		int nestingLevel;
+		bool isHole;
+		bool clockwise;
+		
+		PathMetadata()
+			: parentPathIndex(-1)
+			, nestingLevel(0)
+			, isHole(false)
+			, clockwise(true)
+		{
+		}
+	};
 
-	int                     Width() const { return fWidth; }
-	int                     Height() const { return fHeight; }
+								IndexedBitmap();
+								IndexedBitmap(const std::vector<std::vector<int> >& indexArray,
+											const std::vector<std::vector<unsigned char> >& palette);
 
-	const std::vector<std::vector<int>>& Array() const { return fArray; }
-	const std::vector<std::vector<unsigned char>>& Palette() const { return fPalette; }
-	const std::vector<std::vector<std::vector<std::vector<double>>>>& Layers() const { return fLayers; }
+	int							Width() const { return fWidth; }
+	int							Height() const { return fHeight; }
 
-	void                    SetLayers(const std::vector<std::vector<std::vector<std::vector<double>>>>& layers);
+	const std::vector<std::vector<int> >& Array() const { return fArray; }
+	const std::vector<std::vector<unsigned char> >& Palette() const { return fPalette; }
+	const std::vector<std::vector<std::vector<std::vector<double> > > >& Layers() const { return fLayers; }
+
+	void						SetLayers(const std::vector<std::vector<std::vector<std::vector<double> > > >& layers);
 
 	const std::vector<std::vector<LinearGradient> >& LinearGradients() const { return fLinearGradients; }
-	void                    SetLinearGradients(const std::vector<std::vector<LinearGradient>>& gradients) { fLinearGradients = gradients; }
+	void						SetLinearGradients(const std::vector<std::vector<LinearGradient> >& gradients) { fLinearGradients = gradients; }
+
+	const std::vector<std::vector<PathMetadata> >& PathsMetadata() const { return fPathMetadata; }
+	void						SetPathMetadata(const std::vector<std::vector<PathMetadata> >& metadata) { fPathMetadata = metadata; }
 
 private:
-	int                     fWidth;
-	int                     fHeight;
-	std::vector<std::vector<int>> fArray;
-	std::vector<std::vector<unsigned char>> fPalette;
-	std::vector<std::vector<std::vector<std::vector<double>>>> fLayers;
+	int							fWidth;
+	int							fHeight;
+	std::vector<std::vector<int> > fArray;
+	std::vector<std::vector<unsigned char> > fPalette;
+	std::vector<std::vector<std::vector<std::vector<double> > > > fLayers;
 
-	std::vector<std::vector<LinearGradient>> fLinearGradients;
+	std::vector<std::vector<LinearGradient> > fLinearGradients;
+	std::vector<std::vector<PathMetadata> > fPathMetadata;
 };
 
-#endif // INDEXED_BITMAP_H
+#endif

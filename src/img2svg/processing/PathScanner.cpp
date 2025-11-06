@@ -43,7 +43,7 @@ PathScanner::~PathScanner()
 {
 }
 
-std::vector<std::vector<std::vector<int>>>
+std::vector<std::vector<std::vector<int> > >
 PathScanner::CreateLayers(const IndexedBitmap& indexedBitmap)
 {
 	int value = 0;
@@ -93,10 +93,10 @@ PathScanner::CreateLayers(const IndexedBitmap& indexedBitmap)
 	return layers;
 }
 
-std::vector<std::vector<std::vector<int>>>
-PathScanner::ScanPaths(std::vector<std::vector<int>>& layerArray, float pathOmitThreshold)
+std::vector<std::vector<std::vector<int> > >
+PathScanner::ScanPaths(std::vector<std::vector<int> >& layerArray, const TracingOptions& options)
 {
-	std::vector<std::vector<std::vector<int>>> paths;
+	std::vector<std::vector<std::vector<int> > > paths;
 	int positionX = 0, positionY = 0;
 	int width = layerArray[0].size();
 	int height = layerArray.size();
@@ -104,13 +104,16 @@ PathScanner::ScanPaths(std::vector<std::vector<int>>& layerArray, float pathOmit
 	bool pathFinished = true;
 	bool holePath = false;
 
+	float pathOmitThreshold = options.fPathOmitThreshold;
+	bool keepHolePaths = options.fKeepHolePaths;
+
 	for (int j = 0; j < height; j++) {
 		for (int i = 0; i < width; i++) {
 			if (layerArray[j][i] != 0 && layerArray[j][i] != 15) {
 				positionX = i;
 				positionY = j;
-				paths.push_back(std::vector<std::vector<int>>());
-				std::vector<std::vector<int>>& currentPath = paths.back();
+				paths.push_back(std::vector<std::vector<int> >());
+				std::vector<std::vector<int> >& currentPath = paths.back();
 				pathFinished = false;
 
 				direction = kPathScanDirectionLookup[layerArray[positionY][positionX]];
@@ -164,12 +167,13 @@ PathScanner::ScanPaths(std::vector<std::vector<int>>& layerArray, float pathOmit
 
 				bool removePath = false;
 
-				if (iterations >= maxIterations)
+				if (iterations >= maxIterations) {
 					removePath = true;
-				else if (!closed)
+				} else if (!closed) {
 					removePath = true;
-				else if (holePath || currentPath.size() < pathOmitThreshold)
+				} else if (currentPath.size() < pathOmitThreshold) {
 					removePath = true;
+				}
 
 				if (removePath)
 					paths.pop_back();
@@ -181,12 +185,13 @@ PathScanner::ScanPaths(std::vector<std::vector<int>>& layerArray, float pathOmit
 }
 
 std::vector<std::vector<std::vector<std::vector<int>>>>
-PathScanner::ScanLayerPaths(const std::vector<std::vector<std::vector<int>>>& layers, int pathOmitThreshold)
+PathScanner::ScanLayerPaths(const std::vector<std::vector<std::vector<int>>>& layers,
+							const TracingOptions& options)
 {
 	std::vector<std::vector<std::vector<std::vector<int>>>> batchPaths;
 	for (int k = 0; k < static_cast<int>(layers.size()); k++) {
 		std::vector<std::vector<int>> layerCopy = layers[k];
-		batchPaths.push_back(ScanPaths(layerCopy, static_cast<float>(pathOmitThreshold)));
+		batchPaths.push_back(ScanPaths(layerCopy, options));
 	}
 	return batchPaths;
 }
@@ -213,10 +218,14 @@ PathScanner::CreateInternodes(const std::vector<std::vector<std::vector<int>>>& 
 			const std::vector<int>& point2 = paths[pathIndex][nextIndex];
 			const std::vector<int>& point3 = paths[pathIndex][nextIndex2];
 
-			thisPoint[0] = (point1[0] + point2[0]) / 2.0;
-			thisPoint[1] = (point1[1] + point2[1]) / 2.0;
-			double nextPointX = (point2[0] + point3[0]) / 2.0;
-			double nextPointY = (point2[1] + point3[1]) / 2.0;
+			double rawX = (point1[0] + point2[0]) / 2.0;
+			double rawY = (point1[1] + point2[1]) / 2.0;
+
+			thisPoint[0] = floor(rawX) + 0.5;
+			thisPoint[1] = floor(rawY) + 0.5;
+
+			double nextPointX = floor((point2[0] + point3[0]) / 2.0) + 0.5;
+			double nextPointY = floor((point2[1] + point3[1]) / 2.0) + 0.5;
 
 			// Calculate direction to next point
 			if (thisPoint[0] < nextPointX) {

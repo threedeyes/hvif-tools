@@ -16,21 +16,34 @@ class ColorCube;
 
 class ColorQuantizer {
 public:
-							ColorQuantizer();
-							~ColorQuantizer();
+						ColorQuantizer();
+						~ColorQuantizer();
 
-	std::vector<int>        QuantizeImage(const std::vector<std::vector<int>>& pixels, int maxColors);
+	std::vector<int>	QuantizeImage(const std::vector<std::vector<int> >& pixels, int maxColors);
+	std::vector<int>	QuantizeImageMasked(const std::vector<std::vector<int> >& pixels,
+									int maxColors,
+									int skipValue);
 
-	IndexedBitmap           QuantizeColors(const BitmapData& bitmap,
-										const std::vector<std::vector<unsigned char>>& palette,
-										const TracingOptions& options);
+	IndexedBitmap		QuantizeColors(const BitmapData& bitmap,
+									const std::vector<std::vector<unsigned char> >& palette,
+									const TracingOptions& options);
 
 private:
-	void                    _InitializeTables();
+	void				_AdaptiveSpatialCoherence(std::vector<std::vector<int> >& indexArray,
+									const BitmapData& bitmap,
+									int width, int height,
+									int radius, int passes);
+	
+	void				_MergeSimilarPaletteColors(std::vector<std::vector<unsigned char> >& palette,
+									std::vector<std::vector<int> >& indexArray,
+									int width, int height,
+									int threshold);
+	
+	void				_RemapIndices(std::vector<std::vector<int> >& indexArray,
+									const std::vector<int>& remapTable,
+									int width, int height);
 
-	static bool             sTablesInitialized;
-	static int              sSquares[256 + 256 + 1];
-	static int              sShift[9];
+	double				_ComputeEdgeStrength(const BitmapData& bitmap, int cx, int cy);
 };
 
-#endif // COLOR_QUANTIZER_H
+#endif

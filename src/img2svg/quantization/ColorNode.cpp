@@ -8,33 +8,15 @@
 
 #include "ColorNode.h"
 #include "ColorCube.h"
+#include "MathUtils.h"
 
 static const int kMaxRgb = 255;
 static const int kMaxTreeDepth = 8;
 
-static int sSquares[kMaxRgb + kMaxRgb + 1];
-static int sShift[kMaxTreeDepth + 1];
-static bool sTablesInitialized = false;
-
-static void
-InitializeTables()
-{
-	if (sTablesInitialized)
-		return;
-
-	for (int i = -kMaxRgb; i <= kMaxRgb; i++)
-		sSquares[i + kMaxRgb] = i * i;
-
-	for (int i = 0; i < kMaxTreeDepth + 1; ++i)
-		sShift[i] = 1 << (15 - i);
-
-	sTablesInitialized = true;
-}
-
 ColorNode::ColorNode(ColorCube* cube)
 	: fCube(cube)
 	, fParent(this)
-	, fChildren(8, nullptr)
+	, fChildren(16, NULL)
 	, fChildCount(0)
 	, fId(0)
 	, fLevel(0)
@@ -43,19 +25,21 @@ ColorNode::ColorNode(ColorCube* cube)
 	, fTotalRed(0)
 	, fTotalGreen(0)
 	, fTotalBlue(0)
+	, fTotalAlpha(0)
 	, fColorNumber(0)
 {
-	InitializeTables();
+	MathUtils::Init();
 
 	fMidRed = (kMaxRgb + 1) >> 1;
 	fMidGreen = (kMaxRgb + 1) >> 1;
 	fMidBlue = (kMaxRgb + 1) >> 1;
+	fMidAlpha = (kMaxRgb + 1) >> 1;
 }
 
 ColorNode::ColorNode(ColorNode* parent, int nodeId, int nodeLevel)
 	: fCube(parent->fCube)
 	, fParent(parent)
-	, fChildren(8, nullptr)
+	, fChildren(16, NULL)
 	, fChildCount(0)
 	, fId(nodeId)
 	, fLevel(nodeLevel)
@@ -64,6 +48,7 @@ ColorNode::ColorNode(ColorNode* parent, int nodeId, int nodeLevel)
 	, fTotalRed(0)
 	, fTotalGreen(0)
 	, fTotalBlue(0)
+	, fTotalAlpha(0)
 	, fColorNumber(0)
 {
 	++fCube->fNodes;
@@ -78,11 +63,12 @@ ColorNode::ColorNode(ColorNode* parent, int nodeId, int nodeLevel)
 	fMidRed = fParent->fMidRed + ((fId & 1) > 0 ? bitIndex : -bitIndex);
 	fMidGreen = fParent->fMidGreen + ((fId & 2) > 0 ? bitIndex : -bitIndex);
 	fMidBlue = fParent->fMidBlue + ((fId & 4) > 0 ? bitIndex : -bitIndex);
+	fMidAlpha = fParent->fMidAlpha + ((fId & 8) > 0 ? bitIndex : -bitIndex);
 }
 
 ColorNode::~ColorNode()
 {
-	for (int i = 0; i < 8; i++)
+	for (int i = 0; i < 16; i++)
 		delete fChildren[i];
 }
 
@@ -94,17 +80,18 @@ ColorNode::PruneChild()
 	fParent->fTotalRed += fTotalRed;
 	fParent->fTotalGreen += fTotalGreen;
 	fParent->fTotalBlue += fTotalBlue;
-	fParent->fChildren[fId] = nullptr;
+	fParent->fTotalAlpha += fTotalAlpha;
+	fParent->fChildren[fId] = NULL;
 	--fCube->fNodes;
-	fCube = nullptr;
-	fParent = nullptr;
+	fCube = NULL;
+	fParent = NULL;
 }
 
 void
 ColorNode::PruneLevel()
 {
 	if (fChildCount != 0) {
-		for (int id = 0; id < 8; id++) {
+		for (int id = 0; id < 16; id++) {
 			if (fChildren[id]) {
 				fChildren[id]->PruneLevel();
 			}
@@ -119,7 +106,7 @@ int
 ColorNode::Reduce(int threshold, int nextThreshold)
 {
 	if (fChildCount != 0) {
-		for (int id = 0; id < 8; id++) {
+		for (int id = 0; id < 16; id++) {
 			if (fChildren[id]) {
 				nextThreshold = fChildren[id]->Reduce(threshold, nextThreshold);
 			}
@@ -144,7 +131,7 @@ void
 ColorNode::CreateColormap()
 {
 	if (fChildCount != 0) {
-		for (int id = 0; id < 8; id++) {
+		for (int id = 0; id < 16; id++) {
 			if (fChildren[id]) {
 				fChildren[id]->CreateColormap();
 			}
@@ -155,27 +142,35 @@ ColorNode::CreateColormap()
 		int red   = ((fTotalRed + (fUniqueCount >> 1)) / fUniqueCount);
 		int green = ((fTotalGreen + (fUniqueCount >> 1)) / fUniqueCount);
 		int blue  = ((fTotalBlue + (fUniqueCount >> 1)) / fUniqueCount);
+		int alpha = ((fTotalAlpha + (fUniqueCount >> 1)) / fUniqueCount);
 
-		fCube->fColormap[fCube->fColors] = (0xFF << 24) | ((red & 0xFF) << 16) | 
+		fCube->fColormap[fCube->fColors] = ((alpha & 0xFF) << 24) | ((red & 0xFF) << 16) |
 										  ((green & 0xFF) << 8) | (blue & 0xFF);
 		fColorNumber = fCube->fColors++;
 	}
 }
 
 void
-ColorNode::FindClosestColor(int red, int green, int blue, ColorSearchResult& search)
+ColorNode::FindClosestColor(int red, int green, int blue, int alpha, ColorSearchResult& search)
 {
 	if (fChildCount != 0) {
-		for (int id = 0; id < 8; id++) {
+		for (int id = 0; id < 16; id++) {
 			if (fChildren[id]) {
-				fChildren[id]->FindClosestColor(red, green, blue, search);
+				fChildren[id]->FindClosestColor(red, green, blue, alpha, search);
 			}
 		}
 	}
 
 	if (fUniqueCount != 0) {
 		int color = fCube->fColormap[fColorNumber];
-		int distance = _CalculateDistance(color, red, green, blue);
+		double distance = MathUtils::PerceptualColorDistance(
+			(unsigned char)red, (unsigned char)green, (unsigned char)blue, (unsigned char)alpha,
+			(unsigned char)((color >> 16) & 0xFF),
+			(unsigned char)((color >> 8) & 0xFF),
+			(unsigned char)(color & 0xFF),
+			(unsigned char)((color >> 24) & 0xFF)
+		);
+
 		if (distance < search.distance) {
 			search.distance = distance;
 			search.colorNumber = fColorNumber;
@@ -186,40 +181,30 @@ ColorNode::FindClosestColor(int red, int green, int blue, ColorSearchResult& sea
 ColorNode*
 ColorNode::GetChild(int index) const
 {
-	if (index >= 0 && index < 8)
+	if (index >= 0 && index < 16)
 		return fChildren[index];
 
-	return nullptr;
+	return NULL;
 }
 
 void
 ColorNode::SetChild(int index, ColorNode* child)
 {
-	if (index >= 0 && index < 8)
+	if (index >= 0 && index < 16)
 		fChildren[index] = child;
 }
 
 void
-ColorNode::AddColor(int red, int green, int blue)
+ColorNode::AddColor(int red, int green, int blue, int alpha)
 {
 	fTotalRed += red;
 	fTotalGreen += green;
 	fTotalBlue += blue;
+	fTotalAlpha += alpha;
 }
 
 int
 ColorNode::GetShift(int level)
 {
-	InitializeTables();
-	return sShift[level];
-}
-
-int
-ColorNode::_CalculateDistance(int color, int red, int green, int blue)
-{
-	InitializeTables();
-
-	return (sSquares[((color >> 16) & 0xFF) - red + kMaxRgb] +
-			sSquares[((color >> 8) & 0xFF) - green + kMaxRgb] +
-			sSquares[(color & 0xFF) - blue + kMaxRgb]);
+	return MathUtils::GetShift(level);
 }

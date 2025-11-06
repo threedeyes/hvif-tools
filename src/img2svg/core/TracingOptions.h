@@ -7,6 +7,7 @@
 #define TRACING_OPTIONS_H
 
 #include <string>
+
 #include "BackgroundRemover.h"
 
 class TracingOptions {
@@ -27,8 +28,6 @@ public:
 	// Output scaling and formatting
 	float					fScale;
 	float					fRoundCoordinates;
-	float					fLineControlPointRadius;
-	float					fQuadraticControlPointRadius;
 	bool					fShowDescription;
 	std::string				fCustomDescription;
 	bool					fUseViewBox;
@@ -76,14 +75,34 @@ public:
 	bool					fVisvalingamWhyattEnabled;
 	float					fVisvalingamWhyattTolerance;
 
-	// Gradient detection
-	bool                    fDetectGradients;
-	int                     fGradientSampleStride;     // sampling stride in px
-	float                   fGradientMinR2;            // min R^2 for luminance regression
-	float                   fGradientMinDelta;         // min RGB L2 delta between endpoints
-	float                   fGradientMinSize;          // min size along gradient axis
-	int                     fGradientMaxSubdiv;        // subdivisions for quadratic flatten
-	int                     fGradientMinSamples;       // minimum samples inside shape
+	// Gradient detection (base)
+	bool					fDetectGradients;
+	int						fGradientSampleStride;
+	float					fGradientMinR2;
+	float					fGradientMinDelta;
+	float					fGradientMinSize;
+	int						fGradientMaxSubdiv;
+	int						fGradientMinSamples;
+
+	// Gradient detection (improved)
+	float					fGradientMinR2Total;
+	int						fGradientMinAlpha;
+	bool					fGradientUseLinearRGB;
+
+	// Gradient detection (region merging)
+	float					fRegionMergeBoundaryColorTol;
+	float					fRegionMergeAngleToleranceDeg;
+	int						fRegionMergeMinBoundaryCount;
+	bool					fRegionMergeUseLinearRGB;
+
+	// Path scanning
+	bool					fKeepHolePaths;
+	float					fMinHolePathRatio;
+
+	// Spatial coherence
+	bool					fSpatialCoherence;
+	int						fSpatialCoherenceRadius;
+	int						fSpatialCoherencePasses;
 };
 
-#endif // TRACING_OPTIONS_H
+#endif

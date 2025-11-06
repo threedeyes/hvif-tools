@@ -8,20 +8,34 @@
 
 #include "SelectiveBlur.h"
 
-const double SelectiveBlur::kGaussianKernels[5][11] = {
-	{0.27901, 0.44198, 0.27901}, // radius 1
-	{0.135336, 0.228569, 0.272192, 0.228569, 0.135336}, // radius 2
-	{0.086776, 0.136394, 0.178908, 0.195843, 0.178908, 0.136394, 0.086776}, // radius 3
-	{0.063327, 0.093095, 0.122589, 0.144599, 0.152781, 0.144599, 0.122589, 0.093095, 0.063327}, // radius 4
-	{0.049692, 0.069304, 0.089767, 0.107988, 0.120651, 0.125194, 0.120651, 0.107988, 0.089767, 0.069304, 0.049692} // radius 5
-};
-
 SelectiveBlur::SelectiveBlur()
 {
 }
 
 SelectiveBlur::~SelectiveBlur()
 {
+}
+
+std::vector<double>
+SelectiveBlur::_GenerateGaussianKernel(int radius)
+{
+	std::vector<double> kernel(radius * 2 + 1);
+	double sigma = radius / 2.0;
+	if (sigma < 0.5) sigma = 0.5;
+
+	double sum = 0.0;
+
+	for (int i = -radius; i <= radius; i++) {
+		double val = exp(-(i * i) / (2.0 * sigma * sigma));
+		kernel[i + radius] = val;
+		sum += val;
+	}
+
+	for (int i = 0; i < static_cast<int>(kernel.size()); i++) {
+		kernel[i] /= sum;
+	}
+
+	return kernel;
 }
 
 BitmapData
@@ -41,7 +55,7 @@ SelectiveBlur::BlurBitmap(const BitmapData& bitmap, float radius, float delta)
 	if (deltaInt > 1024)
 		deltaInt = 1024;
 
-	const double* gaussianKernel = kGaussianKernels[radiusInt - 1];
+	std::vector<double> gaussianKernel = _GenerateGaussianKernel(radiusInt);
 
 	// Horizontal blur pass
 	for (int y = 0; y < bitmap.Height(); y++) {

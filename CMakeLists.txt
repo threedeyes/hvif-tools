@@ -72,6 +72,7 @@ set(IMG2SVG_CORE_DIR ${IMG2SVG_DIR}/core)
 set(IMG2SVG_QUANTIZATION_DIR ${IMG2SVG_DIR}/quantization)
 set(IMG2SVG_PROCESSING_DIR ${IMG2SVG_DIR}/processing)
 set(IMG2SVG_OUTPUT_DIR ${IMG2SVG_DIR}/output)
+set(IMG2SVG_UTILS_DIR ${IMG2SVG_DIR}/utils)
 
 set(IMG2SVG_CORE_SOURCES
     ${IMG2SVG_CORE_DIR}/BitmapData.cpp
@@ -91,14 +92,22 @@ set(IMG2SVG_PROCESSING_SOURCES
     ${IMG2SVG_PROCESSING_DIR}/PathScanner.cpp
     ${IMG2SVG_PROCESSING_DIR}/PathTracer.cpp
     ${IMG2SVG_PROCESSING_DIR}/PathSimplifier.cpp
+    ${IMG2SVG_PROCESSING_DIR}/PathHierarchy.cpp
     ${IMG2SVG_PROCESSING_DIR}/GeometryDetector.cpp
     ${IMG2SVG_PROCESSING_DIR}/BackgroundRemover.cpp
     ${IMG2SVG_PROCESSING_DIR}/VisvalingamWhyatt.cpp
     ${IMG2SVG_PROCESSING_DIR}/GradientDetector.cpp
+    ${IMG2SVG_PROCESSING_DIR}/GradientDetector.cpp
+    ${IMG2SVG_PROCESSING_DIR}/RegionMerger.cpp
+    ${IMG2SVG_PROCESSING_DIR}/SharedEdgeRegistry.cpp
 )
 
 set(IMG2SVG_OUTPUT_SOURCES
     ${IMG2SVG_OUTPUT_DIR}/SvgWriter.cpp
+)
+
+set(IMG2SVG_UTILS_SOURCES
+    ${IMG2SVG_UTILS_DIR}/MathUtils.cpp
 )
 
 set(IMG2SVG_ALL_SOURCES
@@ -106,6 +115,7 @@ set(IMG2SVG_ALL_SOURCES
     ${IMG2SVG_QUANTIZATION_SOURCES}
     ${IMG2SVG_PROCESSING_SOURCES}
     ${IMG2SVG_OUTPUT_SOURCES}
+    ${IMG2SVG_UTILS_SOURCES}
     ${IMG2SVG_DIR}/img2svg.cpp
 )
 
@@ -118,6 +128,7 @@ target_include_directories(img2svg
     ${IMG2SVG_QUANTIZATION_DIR}
     ${IMG2SVG_PROCESSING_DIR}
     ${IMG2SVG_OUTPUT_DIR}
+    ${IMG2SVG_UTILS_DIR}
     ${IMG2SVG_DIR}
     ${STB_DIR}
 )

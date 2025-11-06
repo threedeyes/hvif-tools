@@ -7,38 +7,40 @@
 #define COLOR_CUBE_H
 
 #include <vector>
+#include "MathUtils.h"
 
 class ColorNode;
 
 struct ColorSearchResult {
-	int                     distance;
-	int                     colorNumber;
+	double					distance;
+	int						colorNumber;
 
-							ColorSearchResult() : distance(0), colorNumber(0) {}
+							ColorSearchResult() : distance(MathUtils::MAX_DISTANCE), colorNumber(0) {}
 };
 
 class ColorCube {
 public:
-							ColorCube(const std::vector<std::vector<int>>& pixels, int maxColors);
+							ColorCube(const std::vector<std::vector<int> >& pixels, int maxColors, int skipValue = 2147483647);
 							~ColorCube();
 
-	void                    ClassifyColors();
-	void                    ReduceColors();
-	void                    AssignColors();
+	void					ClassifyColors();
+	void					ReduceColors();
+	void					AssignColors();
 
-	std::vector<int>        GetColormap() const { return fColormap; }
+	std::vector<int>		GetColormap() const { return fColormap; }
 
 private:
 	friend class ColorNode;
 
-	std::vector<std::vector<int>> fPixels;
-	int                     fMaxColors;
-	std::vector<int>        fColormap;
+	std::vector<std::vector<int> > fPixels;
+	int						fMaxColors;
+	std::vector<int>		fColormap;
 
-	ColorNode*              fRoot;
-	int                     fDepth;
-	int                     fColors;
-	int                     fNodes;
+	ColorNode*				fRoot;
+	int						fDepth;
+	int						fColors;
+	int						fNodes;
+	int						fSkipValue;
 };
 
-#endif // COLOR_CUBE_H
+#endif
