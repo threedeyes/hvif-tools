@@ -9,12 +9,14 @@
 #include <string>
 
 #include "BackgroundRemover.h"
+#include "VectorizationProgress.h"
 
 class TracingOptions {
 public:
 							TracingOptions();
 
 	void					SetDefaults();
+	void					SetProgressCallback(ProgressCallback callback, void* userData);
 
 	// Basic tracing parameters
 	float					fLineThreshold;
@@ -103,6 +105,10 @@ public:
 	bool					fSpatialCoherence;
 	int						fSpatialCoherenceRadius;
 	int						fSpatialCoherencePasses;
+
+	// Progress callback
+	ProgressCallback		fProgressCallback;
+	void*					fProgressUserData;
 };
 
 #endif

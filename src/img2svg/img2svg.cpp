@@ -1,3 +1,4 @@
+// Filename: ./img2svg.cpp
 /*
  * Copyright 2025, Gerasim Troeglazov, 3dEyes@gmail.com. All rights reserved.
  * Distributed under the terms of the MIT License.
@@ -8,9 +9,51 @@
 #include <cstdlib>
 
 #include "ImageTracer.h"
+#include "VectorizationProgress.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+
+static const char*
+GetStageName(int stage)
+{
+	switch (stage) {
+		case STAGE_STARTING: return "Starting vectorization";
+		case STAGE_REMOVE_BACKGROUND: return "Removing background";
+		case STAGE_BLUR: return "Applying blur filter";
+		case STAGE_CREATE_PALETTE: return "Creating color palette";
+		case STAGE_QUANTIZE_COLORS: return "Quantizing colors";
+		case STAGE_MERGE_REGIONS: return "Merging gradient regions";
+		case STAGE_SCAN_PATHS: return "Scanning edge paths";
+		case STAGE_TRACE_PATHS: return "Tracing vector paths";
+		case STAGE_SIMPLIFY_VW: return "Simplifying paths (Visvalingam-Whyatt)";
+		case STAGE_FILTER_SMALL: return "Filtering small objects";
+		case STAGE_SIMPLIFY_DP: return "Simplifying paths (Douglas-Peucker)";
+		case STAGE_SIMPLIFY_ADVANCED: return "Advanced path simplification";
+		case STAGE_DETECT_GEOMETRY: return "Detecting geometric shapes";
+		case STAGE_UNIFY_EDGES: return "Unifying shared edges";
+		case STAGE_FIX_WINDING: return "Fixing path winding order";
+		case STAGE_DETECT_GRADIENTS: return "Detecting gradients";
+		case STAGE_COMPLETE: return "Vectorization complete";
+		default: return "Processing";
+	}
+}
+
+static void
+ConsoleProgressCallback(int stage, int percent, void* userData)
+{
+	bool* verbosePtr = static_cast<bool*>(userData);
+	bool verbose = (verbosePtr != NULL) ? *verbosePtr : false;
+
+	if (verbose) {
+		std::cout << "[" << percent << "%] " << GetStageName(stage) << std::endl;
+	} else {
+		std::cout << "\rProgress: " << percent << "%" << std::flush;
+		if (percent >= 100) {
+			std::cout << std::endl;
+		}
+	}
+}
 
 void
 PrintUsage(const char* programName)
@@ -18,6 +61,10 @@ PrintUsage(const char* programName)
 	TracingOptions defaults;
 
 	std::cout << "Usage: " << programName << " <input_file> <output_file> [options]\n\n";
+
+	std::cout << "General options:\n";
+	std::cout << "  --verbose                    Show detailed progress information\n";
+	std::cout << "\n";
 
 	std::cout << "Basic tracing parameters:\n";
 	std::cout << "  --ltres <value>              Line threshold (default: " << defaults.fLineThreshold << ")\n";
@@ -105,6 +152,7 @@ PrintUsage(const char* programName)
 	std::cout << "  " << programName << " input.png output.svg --douglas 1 --optimize_svg 1\n";
 	std::cout << "  " << programName << " input.png output.svg --remove_bg 1 --bg_method 1 --bg_tolerance 15\n";
 	std::cout << "  " << programName << " input.png output.svg --vw_enable 1 --vw_tolerance 1.5\n";
+	std::cout << "  " << programName << " input.png output.svg --verbose\n";
 }
 
 float
@@ -156,9 +204,12 @@ main(int argc, char* argv[])
 	std::string outputFile = argv[2];
 
 	TracingOptions options;
+	bool verboseProgress = false;
 
 	for (int i = 3; i < argc; i++) {
-		if (i + 1 < argc) {
+		if (strcmp(argv[i], "--verbose") == 0) {
+			verboseProgress = true;
+		} else if (i + 1 < argc) {
 			if (strcmp(argv[i], "--ltres") == 0) {
 				options.fLineThreshold = ParseFloat(argv[++i]);
 			} else if (strcmp(argv[i], "--qtres") == 0) {
@@ -260,6 +311,8 @@ main(int argc, char* argv[])
 			std::cerr << "Warning: Option " << argv[i] << " requires a value" << std::endl;
 		}
 	}
+
+	options.SetProgressCallback(ConsoleProgressCallback, &verboseProgress);
 
 	try {
 		BitmapData bitmap = LoadBitmapData(inputFile);

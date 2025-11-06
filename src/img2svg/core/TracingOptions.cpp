@@ -84,4 +84,14 @@ TracingOptions::SetDefaults()
 	fSpatialCoherence = true;
 	fSpatialCoherenceRadius = 2;
 	fSpatialCoherencePasses = 2;
+
+	fProgressCallback = NULL;
+	fProgressUserData = NULL;
+}
+
+void
+TracingOptions::SetProgressCallback(ProgressCallback callback, void* userData)
+{
+	fProgressCallback = callback;
+	fProgressUserData = userData;
 }
