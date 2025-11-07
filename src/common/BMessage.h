@@ -305,7 +305,16 @@ private:
 				MESSAGE_FORMAT_HAIKU_SWAPPED	= 'HMF1',
 				FIELD_FLAG_VALID				= 0x0001,
 				FIELD_FLAG_FIXED_SIZE			= 0x0002,
-				MESSAGE_BODY_HASH_TABLE_SIZE	= 5
+				MESSAGE_BODY_HASH_TABLE_SIZE	= 5,
+				// R5 specific flags
+				R5_MESSAGE_FLAG_VALID			= 0x01,
+				R5_MESSAGE_FLAG_INCLUDE_TARGET	= 0x02,
+				R5_MESSAGE_FLAG_INCLUDE_REPLY	= 0x04,
+				R5_MESSAGE_FLAG_SCRIPT_MESSAGE	= 0x08,
+				R5_FIELD_FLAG_VALID				= 0x01,
+				R5_FIELD_FLAG_MINI_DATA			= 0x02,
+				R5_FIELD_FLAG_FIXED_SIZE		= 0x04,
+				R5_FIELD_FLAG_SINGLE_ITEM		= 0x08
 			};
 
 #pragma pack(push, 1)
@@ -334,6 +343,15 @@ private:
 				uint32_t	offset;
 				int32_t		next_field;
 			};
+
+			// R5 format header (completely different!)
+			struct r5_message_header {
+				uint32_t	magic;
+				uint32_t	checksum;
+				int32_t		flattened_size;
+				int32_t		what;
+				uint8_t		flags;
+			};
 #pragma pack(pop)
 
 			message_header*		fHeader;
@@ -353,12 +371,23 @@ private:
 									bool showValues) const;
 			const char*			_TypeCodeToString(type_code type) const;
 
+			// R5 format support
+			status_t			_UnflattenR5Message(const uint8_t* buffer,
+									ssize_t size);
+			status_t			_AddR5Field(const char* name, type_code type,
+									const void* data, ssize_t dataSize,
+									bool fixedSize, int32_t count);
+
 	static	uint32_t			_SwapUInt32(uint32_t value);
 	static	uint16_t			_SwapUInt16(uint16_t value);
 	static	int32_t				_SwapInt32(int32_t value);
 
 			void				_SwapHeaderFields();
 			void				_SwapFieldHeader(field_header* field);
+
+	static	int32_t				_Pad8(int32_t value) {
+									return (value + 7) & ~7;
+								}
 };
 
 #endif

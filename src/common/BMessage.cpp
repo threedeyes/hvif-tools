@@ -183,19 +183,28 @@ BMessage::Unflatten(const char* flatBuffer, ssize_t size)
 	uint32_t format;
 	memcpy(&format, buffer, 4);
 
+	bool needSwap = false;
 	if (format == MESSAGE_FORMAT_HAIKU_SWAPPED
 		|| format == MESSAGE_FORMAT_R5_SWAPPED
 		|| format == MESSAGE_FORMAT_DANO_SWAPPED) {
-		fNeedSwap = true;
+		needSwap = true;
 		format = _SwapUInt32(format);
-	} else
-		fNeedSwap = false;
+	}
 
-	if (format != MESSAGE_FORMAT_HAIKU
-		&& format != MESSAGE_FORMAT_R5
-		&& format != MESSAGE_FORMAT_DANO) {
+	if (format == MESSAGE_FORMAT_R5) {
+		fNeedSwap = needSwap;
+		return _UnflattenR5Message(buffer, size);
+	}
+
+	if (format == MESSAGE_FORMAT_DANO) {
 		return B_BAD_DATA;
 	}
+
+	if (format != MESSAGE_FORMAT_HAIKU) {
+		return B_BAD_DATA;
+	}
+
+	fNeedSwap = needSwap;
 
 	fHeader = (message_header*)malloc(sizeof(message_header));
 	if (fHeader == NULL)
@@ -262,6 +271,219 @@ BMessage::Unflatten(const char* flatBuffer, ssize_t size)
 	}
 
 	return _ValidateMessage();
+}
+
+
+// #pragma mark - R5 Format Support
+
+
+status_t
+BMessage::_UnflattenR5Message(const uint8_t* buffer, ssize_t totalSize)
+{
+	status_t result = _InitHeader();
+	if (result != B_OK)
+		return result;
+
+	r5_message_header r5header;
+	memcpy(&r5header, buffer, sizeof(r5_message_header));
+
+	if (fNeedSwap) {
+		r5header.checksum = _SwapUInt32(r5header.checksum);
+		r5header.flattened_size = _SwapInt32(r5header.flattened_size);
+		r5header.what = _SwapInt32(r5header.what);
+	}
+
+	what = fHeader->what = r5header.what;
+
+	const uint8_t* pointer = buffer + sizeof(r5_message_header);
+	const uint8_t* end = buffer + (totalSize > 0 ? totalSize : r5header.flattened_size);
+
+	if (r5header.flags & R5_MESSAGE_FLAG_INCLUDE_TARGET) {
+		if (pointer + sizeof(int32_t) > end)
+			return B_BAD_DATA;
+		pointer += sizeof(int32_t);
+	}
+
+	if (r5header.flags & R5_MESSAGE_FLAG_INCLUDE_REPLY) {
+		if (pointer + sizeof(int32_t) * 3 + 4 > end)
+			return B_BAD_DATA;
+		pointer += sizeof(int32_t) * 3 + 4;
+	}
+
+	while (pointer < end) {
+		uint8_t flags = *pointer++;
+		if ((flags & R5_FIELD_FLAG_VALID) == 0)
+			break;
+
+		if (pointer + sizeof(type_code) > end)
+			return B_BAD_DATA;
+
+		type_code type;
+		memcpy(&type, pointer, sizeof(type_code));
+		pointer += sizeof(type_code);
+		if (fNeedSwap)
+			type = _SwapUInt32(type);
+
+		int32_t itemCount = 1;
+		if ((flags & R5_FIELD_FLAG_SINGLE_ITEM) == 0) {
+			if (flags & R5_FIELD_FLAG_MINI_DATA) {
+				if (pointer + 1 > end)
+					return B_BAD_DATA;
+				itemCount = *pointer++;
+			} else {
+				if (pointer + sizeof(int32_t) > end)
+					return B_BAD_DATA;
+				memcpy(&itemCount, pointer, sizeof(int32_t));
+				pointer += sizeof(int32_t);
+				if (fNeedSwap)
+					itemCount = _SwapInt32(itemCount);
+			}
+		}
+
+		int32_t dataSize;
+		if (flags & R5_FIELD_FLAG_MINI_DATA) {
+			if (pointer + 1 > end)
+				return B_BAD_DATA;
+			dataSize = *pointer++;
+		} else {
+			if (pointer + sizeof(int32_t) > end)
+				return B_BAD_DATA;
+			memcpy(&dataSize, pointer, sizeof(int32_t));
+			pointer += sizeof(int32_t);
+			if (fNeedSwap)
+				dataSize = _SwapInt32(dataSize);
+		}
+
+		if (dataSize < 0 || dataSize > 100 * 1024 * 1024)
+			return B_BAD_DATA;
+
+		if (pointer + 1 > end)
+			return B_BAD_DATA;
+		uint8_t nameLength = *pointer++;
+
+		if (pointer + nameLength > end)
+			return B_BAD_DATA;
+
+		char nameBuffer[256];
+		memcpy(nameBuffer, pointer, nameLength);
+		nameBuffer[nameLength] = '\0';
+		pointer += nameLength;
+
+		if (pointer + dataSize > end)
+			return B_BAD_DATA;
+
+		const uint8_t* dataPointer = pointer;
+		bool fixedSize = (flags & R5_FIELD_FLAG_FIXED_SIZE) != 0;
+
+		if (fixedSize) {
+			int32_t itemSize = dataSize / itemCount;
+			for (int32_t i = 0; i < itemCount; i++) {
+				result = _AddR5Field(nameBuffer, type, dataPointer, itemSize,
+					true, itemCount);
+				if (result != B_OK)
+					return result;
+				dataPointer += itemSize;
+			}
+		} else {
+			for (int32_t i = 0; i < itemCount; i++) {
+				if (dataPointer + sizeof(int32_t) > pointer + dataSize)
+					return B_BAD_DATA;
+
+				int32_t itemSize;
+				memcpy(&itemSize, dataPointer, sizeof(int32_t));
+				if (fNeedSwap)
+					itemSize = _SwapInt32(itemSize);
+
+				dataPointer += sizeof(int32_t);
+
+				if (dataPointer + itemSize > pointer + dataSize)
+					return B_BAD_DATA;
+
+				result = _AddR5Field(nameBuffer, type, dataPointer, itemSize,
+					false, itemCount);
+				if (result != B_OK)
+					return result;
+
+				dataPointer += _Pad8(itemSize + sizeof(int32_t)) - sizeof(int32_t);
+			}
+		}
+
+		pointer += dataSize;
+	}
+
+	return B_OK;
+}
+
+
+status_t
+BMessage::_AddR5Field(const char* name, type_code type, const void* data,
+	ssize_t dataSize, bool fixedSize, int32_t count)
+{
+	if (fHeader == NULL)
+		return B_NO_INIT;
+
+	field_header* field = NULL;
+	for (uint32_t i = 0; i < fHeader->field_count; i++) {
+		const char* fieldName = (const char*)(fData + fFields[i].offset);
+		if (strcmp(fieldName, name) == 0) {
+			field = &fFields[i];
+			break;
+		}
+	}
+
+	if (field == NULL) {
+		fHeader->field_count++;
+		field_header* newFields = (field_header*)realloc(fFields,
+			fHeader->field_count * sizeof(field_header));
+		if (newFields == NULL) {
+			fHeader->field_count--;
+			return B_NO_MEMORY;
+		}
+		fFields = newFields;
+		field = &fFields[fHeader->field_count - 1];
+
+		field->flags = FIELD_FLAG_VALID;
+		if (fixedSize)
+			field->flags |= FIELD_FLAG_FIXED_SIZE;
+		field->type = type;
+		field->count = 0;
+		field->data_size = 0;
+		field->offset = fHeader->data_size;
+		field->next_field = -1;
+		field->name_length = strlen(name) + 1;
+
+		uint8_t* newData = (uint8_t*)realloc(fData,
+			fHeader->data_size + field->name_length);
+		if (newData == NULL)
+			return B_NO_MEMORY;
+		fData = newData;
+
+		memcpy(fData + fHeader->data_size, name, field->name_length);
+		fHeader->data_size += field->name_length;
+	}
+
+	ssize_t sizeToAdd = dataSize;
+	if (!fixedSize)
+		sizeToAdd += sizeof(uint32_t);
+
+	uint8_t* newData = (uint8_t*)realloc(fData, fHeader->data_size + sizeToAdd);
+	if (newData == NULL)
+		return B_NO_MEMORY;
+	fData = newData;
+
+	if (!fixedSize) {
+		uint32_t size = (uint32_t)dataSize;
+		memcpy(fData + fHeader->data_size, &size, sizeof(uint32_t));
+		memcpy(fData + fHeader->data_size + sizeof(uint32_t), data, dataSize);
+	} else {
+		memcpy(fData + fHeader->data_size, data, dataSize);
+	}
+
+	fHeader->data_size += sizeToAdd;
+	field->data_size += sizeToAdd;
+	field->count++;
+
+	return B_OK;
 }
 
 
@@ -380,24 +602,19 @@ BMessage::_FindField(const char* name, type_code type,
 	if (fHeader->field_count == 0 || fFields == NULL || fData == NULL)
 		return B_NAME_NOT_FOUND;
 
-	uint32_t hash = _HashName(name) % fHeader->hash_table_size;
-	int32_t nextField = fHeader->hash_table[hash];
-
-	while (nextField >= 0) {
-		field_header* field = &fFields[nextField];
+	for (uint32_t i = 0; i < fHeader->field_count; i++) {
+		field_header* field = &fFields[i];
 		if ((field->flags & FIELD_FLAG_VALID) == 0)
-			break;
+			continue;
 
-		if (strncmp((const char*)(fData + field->offset), name,
-				field->name_length) == 0) {
+		const char* fieldName = (const char*)(fData + field->offset);
+		if (strcmp(fieldName, name) == 0) {
 			if (type != B_ANY_TYPE && field->type != type)
 				return B_BAD_TYPE;
 
 			*result = field;
 			return B_OK;
 		}
-
-		nextField = field->next_field;
 	}
 
 	return B_NAME_NOT_FOUND;
