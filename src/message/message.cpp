@@ -16,6 +16,7 @@ print_usage(const char* program)
 		<< "Options:\n"
 		<< "  -v, --values    Show field values\n"
 		<< "  -x, --hexdump   Show full hex dump\n"
+		<< "  -o, --offset N  Start reading at offset N (default: 0)\n"
 		<< "  -h, --help      Show this help message\n";
 }
 
@@ -56,6 +57,7 @@ main(int argc, char* argv[])
 
 	bool showValues = false;
 	bool showHexdump = false;
+	size_t offset = 0;
 	const char* filename = NULL;
 
 	for (int i = 1; i < argc; i++) {
@@ -64,6 +66,21 @@ main(int argc, char* argv[])
 		} else if (strcmp(argv[i], "-x") == 0
 			|| strcmp(argv[i], "--hexdump") == 0) {
 			showHexdump = true;
+		} else if (strcmp(argv[i], "-o") == 0
+			|| strcmp(argv[i], "--offset") == 0) {
+			if (i + 1 >= argc) {
+				std::cerr << "Error: --offset requires an argument\n";
+				print_usage(argv[0]);
+				return 1;
+			}
+			i++;
+			char* endptr;
+			long long value = strtoll(argv[i], &endptr, 0);
+			if (*endptr != '\0' || value < 0) {
+				std::cerr << "Error: Invalid offset value '" << argv[i] << "'\n";
+				return 1;
+			}
+			offset = (size_t)value;
 		} else if (strcmp(argv[i], "-h") == 0
 			|| strcmp(argv[i], "--help") == 0) {
 			print_usage(argv[0]);
@@ -94,20 +111,29 @@ main(int argc, char* argv[])
 		return 1;
 	}
 
+	if (offset >= size) {
+		std::cerr << "Error: Offset " << offset 
+			<< " is beyond file size " << size << "\n";
+		return 1;
+	}
+
 	char* buffer = new char[size];
 	file.read(buffer, size);
 	file.close();
 
 	if (showHexdump) {
 		std::cout << "File: " << filename << "\n";
-		std::cout << "Size: " << size << " bytes\n\n";
+		std::cout << "Size: " << size << " bytes\n";
+		if (offset > 0)
+			std::cout << "Offset: " << offset << " bytes\n";
+		std::cout << "\n";
 		std::cout << "Hex dump:\n";
-		hexdump(buffer, size);
+		hexdump(buffer + offset, size - offset);
 		std::cout << "\n";
 	}
 
 	BMessage message;
-	status_t result = message.Unflatten(buffer, size);
+	status_t result = message.Unflatten(buffer + offset, size - offset);
 	delete[] buffer;
 
 	if (result != B_OK) {
