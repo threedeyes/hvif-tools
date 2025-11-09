@@ -24,7 +24,8 @@ enum {
 	B_BAD_INDEX			= -5,
 	B_BAD_TYPE			= -6,
 	B_NO_INIT			= -7,
-	B_BAD_DATA			= -8
+	B_BAD_DATA			= -8,
+	B_BUFFER_OVERFLOW	= -9
 };
 #endif
 
@@ -60,7 +61,7 @@ typedef uint32_t type_code;
 struct BPoint {
 	float x;
 	float y;
-	
+
 	BPoint() : x(0), y(0) {}
 	BPoint(float x, float y) : x(x), y(y) {}
 };
@@ -70,7 +71,7 @@ struct BRect {
 	float top;
 	float right;
 	float bottom;
-	
+
 	BRect() : left(0), top(0), right(0), bottom(0) {}
 	BRect(float l, float t, float r, float b)
 		: left(l), top(t), right(r), bottom(b) {}
@@ -79,7 +80,7 @@ struct BRect {
 struct BSize {
 	float width;
 	float height;
-	
+
 	BSize() : width(0), height(0) {}
 	BSize(float w, float h) : width(w), height(h) {}
 };
@@ -95,7 +96,7 @@ struct entry_ref {
 	int32_t		device;
 	int64_t		directory;
 	char*		name;
-	
+
 	entry_ref() : device(0), directory(0), name(NULL) {}
 	~entry_ref() { delete[] name; }
 };
@@ -103,7 +104,7 @@ struct entry_ref {
 struct node_ref {
 	int32_t		device;
 	int64_t		node;
-	
+
 	node_ref() : device(0), node(0) {}
 };
 
@@ -121,6 +122,10 @@ public:
 			status_t			Unflatten(const char* flatBuffer,
 									ssize_t size = -1);
 
+			// Flattening
+			ssize_t				FlattenedSize() const;
+			status_t			Flatten(char* buffer, ssize_t size) const;
+
 			// Field info
 			status_t			GetInfo(type_code typeRequested, int32_t index,
 									char** nameFound, type_code* typeFound,
@@ -130,6 +135,41 @@ public:
 
 			int32_t				CountNames(type_code type) const;
 			bool				IsEmpty() const;
+			status_t			MakeEmpty();
+
+			// Adding data
+			status_t			AddData(const char* name, type_code type,
+									const void* data, ssize_t numBytes,
+									bool isFixedSize = true,
+									int32_t count = 1);
+			status_t			AddBool(const char* name, bool value);
+			status_t			AddInt8(const char* name, int8_t value);
+			status_t			AddInt16(const char* name, int16_t value);
+			status_t			AddInt32(const char* name, int32_t value);
+			status_t			AddInt64(const char* name, int64_t value);
+			status_t			AddUInt8(const char* name, uint8_t value);
+			status_t			AddUInt16(const char* name, uint16_t value);
+			status_t			AddUInt32(const char* name, uint32_t value);
+			status_t			AddUInt64(const char* name, uint64_t value);
+			status_t			AddFloat(const char* name, float value);
+			status_t			AddDouble(const char* name, double value);
+			status_t			AddString(const char* name,
+									const char* string);
+			status_t			AddString(const char* name,
+									const std::string& string);
+			status_t			AddPoint(const char* name, BPoint point);
+			status_t			AddRect(const char* name, BRect rect);
+			status_t			AddSize(const char* name, BSize size);
+			status_t			AddColor(const char* name, rgb_color color);
+			status_t			AddPointer(const char* name,
+									const void* pointer);
+			status_t			AddMessage(const char* name,
+									const BMessage* message);
+
+			// Removing data
+			status_t			RemoveData(const char* name,
+									int32_t index = 0);
+			status_t			RemoveName(const char* name);
 
 			// Finding data
 			status_t			FindBool(const char* name, bool* value) const;
@@ -289,11 +329,41 @@ public:
 			const char*			GetString(const char* name, int32_t index,
 									const char* defaultValue) const;
 
+			// Setting data
+			status_t			SetBool(const char* name, bool value);
+			status_t			SetInt8(const char* name, int8_t value);
+			status_t			SetInt16(const char* name, int16_t value);
+			status_t			SetInt32(const char* name, int32_t value);
+			status_t			SetInt64(const char* name, int64_t value);
+			status_t			SetUInt8(const char* name, uint8_t value);
+			status_t			SetUInt16(const char* name, uint16_t value);
+			status_t			SetUInt32(const char* name, uint32_t value);
+			status_t			SetUInt64(const char* name, uint64_t value);
+			status_t			SetFloat(const char* name, float value);
+			status_t			SetDouble(const char* name, double value);
+			status_t			SetString(const char* name, const char* value);
+			status_t			SetString(const char* name,
+									const std::string& value);
+			status_t			SetPoint(const char* name, BPoint value);
+			status_t			SetRect(const char* name, BRect value);
+			status_t			SetSize(const char* name, BSize value);
+			status_t			SetColor(const char* name, rgb_color value);
+			status_t			SetPointer(const char* name,
+									const void* value);
+			status_t			SetMessage(const char* name,
+									const BMessage* value);
+			status_t			SetData(const char* name, type_code type,
+									const void* data, ssize_t numBytes,
+									bool fixedSize = true);
+
 			// Debugging
 			void				PrintToStream() const;
 			void				PrintToStream(bool showValues) const;
+			void				DumpBinaryStructure(const char* label = "") const;
 
 			uint32_t			what;
+
+			class Private;
 
 private:
 			enum {
@@ -369,6 +439,8 @@ private:
 
 			void				_PrintToStream(const char* indent,
 									bool showValues) const;
+			void				_DumpHex(const void* data, size_t size,
+									const char* prefix) const;
 			const char*			_TypeCodeToString(type_code type) const;
 
 			// R5 format support
@@ -377,6 +449,14 @@ private:
 			status_t			_AddR5Field(const char* name, type_code type,
 									const void* data, ssize_t dataSize,
 									bool fixedSize, int32_t count);
+
+			// Data manipulation
+			status_t			_ResizeData(uint32_t offset, int32_t change);
+			void				_UpdateOffsets(uint32_t offset,
+									int32_t change);
+			status_t			_AddField(const char* name, type_code type,
+									bool isFixedSize, field_header** result);
+			status_t			_RemoveField(field_header* field);
 
 	static	uint32_t			_SwapUInt32(uint32_t value);
 	static	uint16_t			_SwapUInt16(uint16_t value);
@@ -388,6 +468,53 @@ private:
 	static	int32_t				_Pad8(int32_t value) {
 									return (value + 7) & ~7;
 								}
+};
+
+
+class BMessage::Private {
+public:
+			Private(BMessage* msg)
+				: fMessage(msg)
+			{
+			}
+
+			Private(BMessage& msg)
+				: fMessage(&msg)
+			{
+			}
+
+			BMessage::message_header*
+			GetMessageHeader()
+			{
+				return fMessage->fHeader;
+			}
+
+			BMessage::field_header*
+			GetMessageFields()
+			{
+				return fMessage->fFields;
+			}
+
+			uint8_t*
+			GetMessageData()
+			{
+				return fMessage->fData;
+			}
+
+			status_t
+			InitHeader()
+			{
+				return fMessage->_InitHeader();
+			}
+
+			status_t
+			Clear()
+			{
+				return fMessage->_Clear();
+			}
+
+private:
+			BMessage*			fMessage;
 };
 
 #endif

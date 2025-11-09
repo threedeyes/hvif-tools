@@ -274,6 +274,52 @@ BMessage::Unflatten(const char* flatBuffer, ssize_t size)
 }
 
 
+// #pragma mark - Flattening
+
+
+ssize_t
+BMessage::FlattenedSize() const
+{
+	if (fHeader == NULL)
+		return B_NO_INIT;
+
+	return sizeof(message_header) + fHeader->field_count * sizeof(field_header)
+		+ fHeader->data_size;
+}
+
+
+status_t
+BMessage::Flatten(char* buffer, ssize_t size) const
+{
+	if (buffer == NULL || size < 0)
+		return B_BAD_VALUE;
+
+	if (fHeader == NULL)
+		return B_NO_INIT;
+
+	if (size < FlattenedSize())
+		return B_BUFFER_OVERFLOW;
+
+	message_header tmpHeader;
+	memcpy(&tmpHeader, fHeader, sizeof(message_header));
+	tmpHeader.what = what;
+
+	memcpy(buffer, &tmpHeader, sizeof(message_header));
+	buffer += sizeof(message_header);
+
+	size_t fieldsSize = fHeader->field_count * sizeof(field_header);
+	if (fieldsSize > 0) {
+		memcpy(buffer, fFields, fieldsSize);
+		buffer += fieldsSize;
+	}
+
+	if (fHeader->data_size > 0)
+		memcpy(buffer, fData, fHeader->data_size);
+
+	return B_OK;
+}
+
+
 // #pragma mark - R5 Format Support
 
 
@@ -602,13 +648,33 @@ BMessage::_FindField(const char* name, type_code type,
 	if (fHeader->field_count == 0 || fFields == NULL || fData == NULL)
 		return B_NAME_NOT_FOUND;
 
+	uint32_t hash = _HashName(name) % fHeader->hash_table_size;
+	int32_t nextField = fHeader->hash_table[hash];
+
+	while (nextField >= 0) {
+		field_header* field = &fFields[nextField];
+		if ((field->flags & FIELD_FLAG_VALID) == 0)
+			break;
+
+		if (strncmp((const char*)(fData + field->offset), name,
+			field->name_length) == 0) {
+			if (type != B_ANY_TYPE && field->type != type)
+				return B_BAD_TYPE;
+
+			*result = field;
+			return B_OK;
+		}
+
+		nextField = field->next_field;
+	}
+
 	for (uint32_t i = 0; i < fHeader->field_count; i++) {
 		field_header* field = &fFields[i];
 		if ((field->flags & FIELD_FLAG_VALID) == 0)
 			continue;
 
-		const char* fieldName = (const char*)(fData + field->offset);
-		if (strcmp(fieldName, name) == 0) {
+		if (strncmp((const char*)(fData + field->offset), name,
+			field->name_length) == 0) {
 			if (type != B_ANY_TYPE && field->type != type)
 				return B_BAD_TYPE;
 
@@ -618,6 +684,159 @@ BMessage::_FindField(const char* name, type_code type,
 	}
 
 	return B_NAME_NOT_FOUND;
+}
+
+
+void
+BMessage::_UpdateOffsets(uint32_t offset, int32_t change)
+{
+	if (offset < fHeader->data_size) {
+		field_header* field = fFields;
+		for (uint32_t i = 0; i < fHeader->field_count; i++, field++) {
+			if (field->offset >= offset)
+				field->offset += change;
+		}
+	}
+}
+
+
+status_t
+BMessage::_ResizeData(uint32_t offset, int32_t change)
+{
+	if (change == 0)
+		return B_OK;
+
+	if (change > 0) {
+		size_t newSize = fHeader->data_size + change;
+		uint8_t* newData = (uint8_t*)realloc(fData, newSize);
+		if (newSize > 0 && newData == NULL)
+			return B_NO_MEMORY;
+
+		fData = newData;
+
+		if (offset < fHeader->data_size) {
+			memmove(fData + offset + change, fData + offset,
+				fHeader->data_size - offset);
+			fHeader->data_size += change;
+			_UpdateOffsets(offset, change);
+		} else {
+			fHeader->data_size += change;
+		}
+	} else {
+		ssize_t length = fHeader->data_size - offset + change;
+		if (length > 0)
+			memmove(fData + offset, fData + offset - change, length);
+
+		fHeader->data_size += change;
+		_UpdateOffsets(offset, change);
+
+		if (fHeader->data_size > 0) {
+			uint8_t* newData = (uint8_t*)realloc(fData, fHeader->data_size);
+			if (newData != NULL)
+				fData = newData;
+		} else {
+			free(fData);
+			fData = NULL;
+		}
+	}
+
+	return B_OK;
+}
+
+
+status_t
+BMessage::_AddField(const char* name, type_code type, bool isFixedSize,
+	field_header** result)
+{
+	if (fHeader == NULL) {
+		status_t status = _InitHeader();
+		if (status != B_OK)
+			return status;
+	}
+
+	fHeader->field_count++;
+	field_header* newFields = (field_header*)realloc(fFields,
+		fHeader->field_count * sizeof(field_header));
+	if (newFields == NULL) {
+		fHeader->field_count--;
+		return B_NO_MEMORY;
+	}
+	fFields = newFields;
+
+	uint32_t hash = _HashName(name) % fHeader->hash_table_size;
+	int32_t* nextField = &fHeader->hash_table[hash];
+	while (*nextField >= 0)
+		nextField = &fFields[*nextField].next_field;
+	*nextField = fHeader->field_count - 1;
+
+	field_header* field = &fFields[fHeader->field_count - 1];
+	field->type = type;
+	field->count = 0;
+	field->data_size = 0;
+	field->next_field = -1;
+	field->offset = fHeader->data_size;
+	field->name_length = strlen(name) + 1;
+
+	status_t status = _ResizeData(field->offset, field->name_length);
+	if (status != B_OK) {
+		fHeader->field_count--;
+		return status;
+	}
+
+	memcpy(fData + field->offset, name, field->name_length);
+	field->flags = FIELD_FLAG_VALID;
+	if (isFixedSize)
+		field->flags |= FIELD_FLAG_FIXED_SIZE;
+
+	*result = field;
+	return B_OK;
+}
+
+
+status_t
+BMessage::_RemoveField(field_header* field)
+{
+	status_t result = _ResizeData(field->offset, -(field->data_size
+		+ field->name_length));
+	if (result != B_OK)
+		return result;
+
+	int32_t index = ((uint8_t*)field - (uint8_t*)fFields) / sizeof(field_header);
+	int32_t nextField = field->next_field;
+	if (nextField > index)
+		nextField--;
+
+	int32_t* value = fHeader->hash_table;
+	for (uint32_t i = 0; i < fHeader->hash_table_size; i++, value++) {
+		if (*value > index)
+			*value -= 1;
+		else if (*value == index)
+			*value = nextField;
+	}
+
+	field_header* other = fFields;
+	for (uint32_t i = 0; i < fHeader->field_count; i++, other++) {
+		if (other->next_field > index)
+			other->next_field--;
+		else if (other->next_field == index)
+			other->next_field = nextField;
+	}
+
+	size_t size = (fHeader->field_count - index - 1) * sizeof(field_header);
+	memmove(fFields + index, fFields + index + 1, size);
+	fHeader->field_count--;
+
+	if (fHeader->field_count > 0) {
+		field_header* newFields = (field_header*)realloc(fFields,
+			fHeader->field_count * sizeof(field_header));
+		if (newFields != NULL)
+			fFields = newFields;
+	} else {
+		free(fFields);
+		fFields = NULL;
+	}
+
+	return B_OK;
 }
 
 
@@ -707,6 +926,220 @@ bool
 BMessage::IsEmpty() const
 {
 	return fHeader == NULL || fHeader->field_count == 0;
+}
+
+
+status_t
+BMessage::MakeEmpty()
+{
+	_Clear();
+	return _InitHeader();
+}
+
+
+// #pragma mark - Adding data
+
+
+status_t
+BMessage::AddData(const char* name, type_code type, const void* data,
+	ssize_t numBytes, bool isFixedSize, int32_t count)
+{
+	if (numBytes <= 0 || data == NULL)
+		return B_BAD_VALUE;
+
+	if (fHeader == NULL) {
+		status_t status = _InitHeader();
+		if (status != B_OK)
+			return status;
+	}
+
+	field_header* field = NULL;
+	status_t result = _FindField(name, type, &field);
+	if (result == B_NAME_NOT_FOUND)
+		result = _AddField(name, type, isFixedSize, &field);
+
+	if (result != B_OK)
+		return result;
+
+	if (field == NULL)
+		return B_ERROR;
+
+	uint32_t offset = field->offset + field->name_length + field->data_size;
+	if ((field->flags & FIELD_FLAG_FIXED_SIZE) != 0) {
+		if (field->count) {
+			ssize_t size = field->data_size / field->count;
+			if (size != numBytes)
+				return B_BAD_VALUE;
+		}
+
+		result = _ResizeData(offset, numBytes);
+		if (result != B_OK) {
+			if (field->count == 0)
+				_RemoveField(field);
+			return result;
+		}
+
+		memcpy(fData + offset, data, numBytes);
+		field->data_size += numBytes;
+	} else {
+		int32_t change = numBytes + sizeof(uint32_t);
+		result = _ResizeData(offset, change);
+		if (result != B_OK) {
+			if (field->count == 0)
+				_RemoveField(field);
+			return result;
+		}
+
+		uint32_t size = (uint32_t)numBytes;
+		memcpy(fData + offset, &size, sizeof(uint32_t));
+		memcpy(fData + offset + sizeof(uint32_t), data, size);
+		field->data_size += change;
+	}
+
+	field->count++;
+	return B_OK;
+}
+
+
+#define DEFINE_ADD_FUNCTION(type, typeName, typeCode) \
+status_t \
+BMessage::Add##typeName(const char* name, type value) \
+{ \
+	return AddData(name, typeCode, &value, sizeof(type), true); \
+}
+
+
+DEFINE_ADD_FUNCTION(bool, Bool, B_BOOL_TYPE)
+DEFINE_ADD_FUNCTION(int8_t, Int8, B_INT8_TYPE)
+DEFINE_ADD_FUNCTION(int16_t, Int16, B_INT16_TYPE)
+DEFINE_ADD_FUNCTION(int32_t, Int32, B_INT32_TYPE)
+DEFINE_ADD_FUNCTION(int64_t, Int64, B_INT64_TYPE)
+DEFINE_ADD_FUNCTION(uint8_t, UInt8, B_UINT8_TYPE)
+DEFINE_ADD_FUNCTION(uint16_t, UInt16, B_UINT16_TYPE)
+DEFINE_ADD_FUNCTION(uint32_t, UInt32, B_UINT32_TYPE)
+DEFINE_ADD_FUNCTION(uint64_t, UInt64, B_UINT64_TYPE)
+DEFINE_ADD_FUNCTION(float, Float, B_FLOAT_TYPE)
+DEFINE_ADD_FUNCTION(double, Double, B_DOUBLE_TYPE)
+DEFINE_ADD_FUNCTION(BPoint, Point, B_POINT_TYPE)
+DEFINE_ADD_FUNCTION(BRect, Rect, B_RECT_TYPE)
+DEFINE_ADD_FUNCTION(BSize, Size, B_SIZE_TYPE)
+DEFINE_ADD_FUNCTION(rgb_color, Color, B_RGB_32_BIT_TYPE)
+
+#undef DEFINE_ADD_FUNCTION
+
+
+status_t
+BMessage::AddString(const char* name, const char* string)
+{
+	if (string == NULL)
+		return B_BAD_VALUE;
+
+	return AddData(name, B_STRING_TYPE, string, strlen(string) + 1, false);
+}
+
+
+status_t
+BMessage::AddString(const char* name, const std::string& string)
+{
+	return AddData(name, B_STRING_TYPE, string.c_str(), string.length() + 1,
+		false);
+}
+
+
+status_t
+BMessage::AddPointer(const char* name, const void* pointer)
+{
+	return AddData(name, B_POINTER_TYPE, &pointer, sizeof(pointer), true);
+}
+
+
+status_t
+BMessage::AddMessage(const char* name, const BMessage* message)
+{
+	if (message == NULL)
+		return B_BAD_VALUE;
+
+	ssize_t size = message->FlattenedSize();
+	if (size < 0)
+		return (status_t)size;
+
+	char* buffer = (char*)malloc(size);
+	if (buffer == NULL)
+		return B_NO_MEMORY;
+
+	status_t error = message->Flatten(buffer, size);
+
+	if (error >= B_OK)
+		error = AddData(name, B_MESSAGE_TYPE, buffer, size, false);
+
+	free(buffer);
+	return error;
+}
+
+
+// #pragma mark - Removing data
+
+
+status_t
+BMessage::RemoveData(const char* name, int32_t index)
+{
+	if (index < 0)
+		return B_BAD_INDEX;
+
+	if (fHeader == NULL)
+		return B_NO_INIT;
+
+	field_header* field = NULL;
+	status_t result = _FindField(name, B_ANY_TYPE, &field);
+	if (result != B_OK)
+		return result;
+
+	if ((uint32_t)index >= field->count)
+		return B_BAD_INDEX;
+
+	if (field->count == 1)
+		return _RemoveField(field);
+
+	uint32_t offset = field->offset + field->name_length;
+	if ((field->flags & FIELD_FLAG_FIXED_SIZE) != 0) {
+		ssize_t size = field->data_size / field->count;
+		result = _ResizeData(offset + index * size, -size);
+		if (result != B_OK)
+			return result;
+
+		field->data_size -= size;
+	} else {
+		uint8_t* pointer = fData + offset;
+		for (int32_t i = 0; i < index; i++) {
+			offset += *(uint32_t*)pointer + sizeof(uint32_t);
+			pointer = fData + offset;
+		}
+
+		size_t currentSize = *(uint32_t*)pointer + sizeof(uint32_t);
+		result = _ResizeData(offset, -currentSize);
+		if (result != B_OK)
+			return result;
+
+		field->data_size -= currentSize;
+	}
+
+	field->count--;
+	return B_OK;
+}
+
+
+status_t
+BMessage::RemoveName(const char* name)
+{
+	if (fHeader == NULL)
+		return B_NO_INIT;
+
+	field_header* field = NULL;
+	status_t result = _FindField(name, B_ANY_TYPE, &field);
+	if (result != B_OK)
+		return result;
+
+	return _RemoveField(field);
 }
 
 
@@ -1018,6 +1451,100 @@ BMessage::GetString(const char* name, int32_t index,
 }
 
 
+// #pragma mark - Setting data
+
+
+#define DEFINE_SET_FUNCTION(type, typeName, typeCode) \
+status_t \
+BMessage::Set##typeName(const char* name, type value) \
+{ \
+	return SetData(name, typeCode, &value, sizeof(type), true); \
+}
+
+
+DEFINE_SET_FUNCTION(bool, Bool, B_BOOL_TYPE)
+DEFINE_SET_FUNCTION(int8_t, Int8, B_INT8_TYPE)
+DEFINE_SET_FUNCTION(int16_t, Int16, B_INT16_TYPE)
+DEFINE_SET_FUNCTION(int32_t, Int32, B_INT32_TYPE)
+DEFINE_SET_FUNCTION(int64_t, Int64, B_INT64_TYPE)
+DEFINE_SET_FUNCTION(uint8_t, UInt8, B_UINT8_TYPE)
+DEFINE_SET_FUNCTION(uint16_t, UInt16, B_UINT16_TYPE)
+DEFINE_SET_FUNCTION(uint32_t, UInt32, B_UINT32_TYPE)
+DEFINE_SET_FUNCTION(uint64_t, UInt64, B_UINT64_TYPE)
+DEFINE_SET_FUNCTION(float, Float, B_FLOAT_TYPE)
+DEFINE_SET_FUNCTION(double, Double, B_DOUBLE_TYPE)
+DEFINE_SET_FUNCTION(BPoint, Point, B_POINT_TYPE)
+DEFINE_SET_FUNCTION(BRect, Rect, B_RECT_TYPE)
+DEFINE_SET_FUNCTION(BSize, Size, B_SIZE_TYPE)
+DEFINE_SET_FUNCTION(rgb_color, Color, B_RGB_32_BIT_TYPE)
+
+#undef DEFINE_SET_FUNCTION
+
+
+status_t
+BMessage::SetString(const char* name, const char* value)
+{
+	if (value == NULL)
+		return B_BAD_VALUE;
+
+	return SetData(name, B_STRING_TYPE, value, strlen(value) + 1, false);
+}
+
+
+status_t
+BMessage::SetString(const char* name, const std::string& value)
+{
+	return SetData(name, B_STRING_TYPE, value.c_str(), value.length() + 1,
+		false);
+}
+
+
+status_t
+BMessage::SetPointer(const char* name, const void* value)
+{
+	return SetData(name, B_POINTER_TYPE, &value, sizeof(value), true);
+}
+
+
+status_t
+BMessage::SetMessage(const char* name, const BMessage* value)
+{
+	if (value == NULL)
+		return B_BAD_VALUE;
+
+	ssize_t size = value->FlattenedSize();
+	char* buffer = (char*)malloc(size);
+	if (buffer == NULL)
+		return B_NO_MEMORY;
+
+	status_t error = value->Flatten(buffer, size);
+
+	if (error >= B_OK)
+		error = SetData(name, B_MESSAGE_TYPE, buffer, size, false);
+
+	free(buffer);
+	return error;
+}
+
+
+status_t
+BMessage::SetData(const char* name, type_code type, const void* data,
+	ssize_t numBytes, bool fixedSize)
+{
+	if (numBytes <= 0 || data == NULL)
+		return B_BAD_VALUE;
+
+	if (fHeader == NULL) {
+		status_t status = _InitHeader();
+		if (status != B_OK)
+			return status;
+	}
+
+	RemoveName(name);
+	return AddData(name, type, data, numBytes, fixedSize);
+}
+
+
 // #pragma mark - Debugging
 
 
@@ -1089,7 +1616,7 @@ BMessage::_PrintToStream(const char* indent, bool showValues) const
 	field_header* field = fFields;
 	for (uint32_t i = 0; i < fHeader->field_count; i++, field++) {
 		const char* name = (const char*)(fData + field->offset);
-		
+
 		if (!showValues) {
 			printf("%s  %-30s  %-10s  count=%u\n",
 				indent, name, _TypeCodeToString(field->type), field->count);
@@ -1207,16 +1734,16 @@ BMessage::_PrintToStream(const char* indent, bool showValues) const
 
 				case B_MESSAGE_TYPE: {
 					printf("BMessage(%zu bytes) ", size);
-					
+
 					BMessage nested;
 					status_t result = nested.Unflatten((const char*)pointer,
 						size);
-					
+
 					if (result == B_OK) {
 						char nestedIndent[256];
 						snprintf(nestedIndent, sizeof(nestedIndent),
 							"%s    ", indent);
-						
+
 						printf("\n");
 						nested._PrintToStream(nestedIndent, showValues);
 					} else {
