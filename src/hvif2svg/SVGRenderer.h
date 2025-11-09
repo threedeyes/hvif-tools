@@ -3,8 +3,8 @@
  * Distributed under the terms of the MIT License.
  */
 
-#ifndef SVG_RENDERER_H
-#define SVG_RENDERER_H
+#ifndef HVIF_SVG_RENDERER_H
+#define HVIF_SVG_RENDERER_H
 
 #include <string>
 #include "HVIFStructures.h"

@@ -3,8 +3,8 @@
  * Distributed under the terms of the MIT License.
  */
 
-#ifndef SVG_RENDERER_H
-#define SVG_RENDERER_H
+#ifndef IOM_SVG_RENDERER_H
+#define IOM_SVG_RENDERER_H
 
 #include <string>
 
