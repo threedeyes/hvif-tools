@@ -7,8 +7,10 @@
 #include <algorithm>
 
 #include "HVIFThumbnailProvider.h"
-#include "HVIFParser.h"
-#include "SVGRenderer.h"
+#include "hvif2svg/HVIFParser.h"
+#include "hvif2svg/SVGRenderer.h"
+#include "iom2svg/IOMParser.h"
+#include "iom2svg/SVGRenderer.h"
 #include "Globals.h"
 
 #define NANOSVG_IMPLEMENTATION
@@ -78,6 +80,29 @@ HVIFThumbnailProvider::Initialize(IStream *pStream, DWORD grfMode)
 	return hr;
 }
 
+enum FileFormat {
+	FORMAT_UNKNOWN,
+	FORMAT_HVIF,
+	FORMAT_IOM
+};
+
+static FileFormat
+DetectFormat(const std::vector<uint8_t>& data)
+{
+	if (data.size() < 4)
+		return FORMAT_UNKNOWN;
+
+	if (hvif::HVIFParser::IsValidHVIFData(data))
+		return FORMAT_HVIF;
+
+	if (data.size() >= 8 && 
+		data[0] == 'I' && data[1] == 'M' && 
+		data[2] == 'S' && data[3] == 'G')
+		return FORMAT_IOM;
+
+	return FORMAT_UNKNOWN;
+}
+
 IFACEMETHODIMP
 HVIFThumbnailProvider::GetThumbnail(UINT cx, HBITMAP *phbmp, WTS_ALPHATYPE *pdwAlpha)
 {
@@ -92,10 +117,10 @@ HVIFThumbnailProvider::GetThumbnail(UINT cx, HBITMAP *phbmp, WTS_ALPHATYPE *pdwA
 		return hr;
 
 	ULONG fileSize = (ULONG)stat.cbSize.QuadPart;
-	if (fileSize == 0 || fileSize > 1024 * 1024)
+	if (fileSize == 0 || fileSize > 10 * 1024 * 1024)
 		return E_FAIL;
 
-	std::vector<uint8_t> hvifData(fileSize);
+	std::vector<uint8_t> fileData(fileSize);
 	
 	LARGE_INTEGER li = {0};
 	hr = m_pStream->Seek(li, STREAM_SEEK_SET, NULL);
@@ -103,21 +128,49 @@ HVIFThumbnailProvider::GetThumbnail(UINT cx, HBITMAP *phbmp, WTS_ALPHATYPE *pdwA
 		return hr;
 
 	ULONG bytesRead = 0;
-	hr = m_pStream->Read(&hvifData[0], fileSize, &bytesRead);
+	hr = m_pStream->Read(&fileData[0], fileSize, &bytesRead);
 	if (FAILED(hr) || bytesRead != fileSize)
 		return E_FAIL;
 
-	if (!hvif::HVIFParser::IsValidHVIFData(hvifData))
+	FileFormat format = DetectFormat(fileData);
+	if (format == FORMAT_UNKNOWN)
 		return E_FAIL;
 
-	hvif::HVIFParser parser;
-	if (!parser.ParseData(hvifData))
+	std::string svgData;
+
+	if (format == FORMAT_HVIF)
+	{
+		hvif::HVIFParser parser;
+		if (!parser.ParseData(fileData))
+			return E_FAIL;
+
+		const hvif::HVIFIcon& icon = parser.GetIcon();
+		hvif::SVGRenderer renderer;
+		svgData = renderer.RenderIcon(icon, cx, cx);
+	}
+	else if (format == FORMAT_IOM)
+	{
+		std::vector<uint8_t> msgData(fileData.begin() + 4, fileData.end());
+
+		BMessage message;
+		status_t result = message.Unflatten(
+			reinterpret_cast<const char*>(&msgData[0]), msgData.size());
+
+		if (result != B_OK)
+			return E_FAIL;
+
+		iom::IOMParser parser;
+		if (!parser.ParseMessage(message))
+			return E_FAIL;
+
+		const iom::Icon& iomIcon = parser.GetIcon();
+		iom::SVGRenderer renderer(false);
+		svgData = renderer.RenderIcon(iomIcon, cx, cx);
+	}
+	else
+	{
 		return E_FAIL;
-
-	const hvif::HVIFIcon& icon = parser.GetIcon();
-
-	hvif::SVGRenderer renderer;
-	std::string svgData = renderer.RenderIcon(icon, cx, cx);
+	}
 
 	NSVGimage* image = nsvgParse(const_cast<char*>(svgData.c_str()), "px", 96.0f);
 	if (!image)

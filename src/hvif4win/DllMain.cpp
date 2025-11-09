@@ -94,7 +94,7 @@ DllRegisterServer(void)
 
 	hr = StringCchPrintfW(szSubkey, ARRAYSIZE(szSubkey), L"CLSID\\%s", szCLSID);
 	if (SUCCEEDED(hr)) {
-		hr = SetHKCRRegistryKeyAndValue(szSubkey, NULL, L"HVIF Thumbnail Provider");
+		hr = SetHKCRRegistryKeyAndValue(szSubkey, NULL, L"Haiku Icon Thumbnail Provider");
 	}
 
 	if (SUCCEEDED(hr)) {
@@ -116,7 +116,19 @@ DllRegisterServer(void)
 	if (SUCCEEDED(hr)) {
 		hr = SetHKCRRegistryKeyAndValue(L".hvif", NULL, L"HVIFFile");
 		if (SUCCEEDED(hr)) {
-			hr = SetHKCRRegistryKeyAndValue(L"HVIFFile", NULL, L"HVIF Icon File");
+			hr = SetHKCRRegistryKeyAndValue(L"HVIFFile", NULL, L"Haiku Vector Icon File");
+		}
+	}
+
+	if (SUCCEEDED(hr)) {
+		hr = SetHKCRRegistryKeyAndValue(
+			L".iom\\ShellEx\\{E357FCCD-A995-4576-B01F-234630154E96}", NULL, szCLSID);
+	}
+
+	if (SUCCEEDED(hr)) {
+		hr = SetHKCRRegistryKeyAndValue(L".iom", NULL, L"IOMFile");
+		if (SUCCEEDED(hr)) {
+			hr = SetHKCRRegistryKeyAndValue(L"IOMFile", NULL, L"Icon-O-Matic File");
 		}
 	}
 
@@ -145,6 +157,17 @@ DllUnregisterServer(void)
 	}
 
 	RegDeleteKeyW(HKEY_CLASSES_ROOT, L".hvif\\ShellEx");
+	RegDeleteKeyW(HKEY_CLASSES_ROOT, L"HVIFFile");
+
+	hr = StringCchPrintfW(szSubkey, ARRAYSIZE(szSubkey), 
+		L".iom\\ShellEx\\{E357FCCD-A995-4576-B01F-234630154E96}");
+
+	if (SUCCEEDED(hr)) {
+		RegDeleteTreeW(HKEY_CLASSES_ROOT, szSubkey);
+	}
+
+	RegDeleteKeyW(HKEY_CLASSES_ROOT, L".iom\\ShellEx");
+	RegDeleteKeyW(HKEY_CLASSES_ROOT, L"IOMFile");
 
 	hr = StringCchPrintfW(szSubkey, ARRAYSIZE(szSubkey), L"CLSID\\%s", szCLSID);
 	if (SUCCEEDED(hr)) {

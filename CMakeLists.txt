@@ -205,6 +205,9 @@ if(WIN32)
       ${HVIF4WIN_DIR}/HVIFThumbnailProvider.cpp
       ${SRC_DIR}/hvif2svg/HVIFParser.cpp
       ${SRC_DIR}/hvif2svg/SVGRenderer.cpp
+      ${SRC_DIR}/iom2svg/IOMParser.cpp
+      ${SRC_DIR}/iom2svg/SVGRenderer.cpp
+      ${SRC_DIR}/common/BMessage.cpp
     )
 
     set(HVIF4WIN_HEADERS
@@ -223,7 +226,7 @@ if(WIN32)
       PRIVATE
         ${HVIF4WIN_DIR}
         ${SRC_DIR}/common
-        ${SRC_DIR}/hvif2svg
+        ${SRC_DIR}
         ${NANOSVG_DIR}
     )
 
