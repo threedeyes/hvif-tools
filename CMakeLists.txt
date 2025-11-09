@@ -80,6 +80,23 @@ target_include_directories(iom2svg
 )
 
 # -----------------------
+# svg2iom
+# -----------------------
+add_executable(svg2iom
+  ${SRC_DIR}/svg2iom/svg2iom.cpp
+  ${SRC_DIR}/svg2iom/IOMWriter.cpp
+  ${SRC_DIR}/svg2iom/SVGParser.cpp
+  ${SRC_DIR}/common/BMessage.cpp
+)
+
+target_include_directories(svg2iom
+  PRIVATE
+    ${SRC_DIR}/common
+    ${SRC_DIR}/svg2iom
+    ${NANOSVG_DIR}
+)
+
+# -----------------------
 # img2svg
 # -----------------------
 set(IMG2SVG_DIR ${SRC_DIR}/img2svg)
@@ -287,7 +304,7 @@ endif()
 include(GNUInstallDirs)
 
 # Install executables
-install(TARGETS hvif2svg svg2hvif img2svg iom2svg
+install(TARGETS hvif2svg svg2hvif img2svg iom2svg svg2iom
   RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
@@ -308,12 +325,12 @@ endif()
 # Optional: Add custom target to build all utilities
 if(WIN32 AND BUILD_THUMBNAIL_PROVIDER)
   add_custom_target(all-tools
-    DEPENDS hvif2svg svg2hvif img2svg iom2svg HVIFThumbnailProvider
+    DEPENDS hvif2svg svg2hvif img2svg iom2svg svg2iom HVIFThumbnailProvider
     COMMENT "Building all hvif-tools utilities including Windows thumbnail provider"
   )
 else()
   add_custom_target(all-tools
-    DEPENDS hvif2svg svg2hvif img2svg iom2svg
+    DEPENDS hvif2svg svg2hvif img2svg iom2svg svg2iom
     COMMENT "Building all hvif-tools utilities"
   )
 endif()
@@ -323,6 +340,7 @@ message(STATUS "Building hvif-tools with the following utilities:")
 message(STATUS "  - hvif2svg: Convert HVIF to SVG")
 message(STATUS "  - svg2hvif: Convert SVG to HVIF")
 message(STATUS "  - iom2svg:  Convert IOM to SVG")
+message(STATUS "  - svg2iom:  Convert SVG to IOM")
 message(STATUS "  - img2svg:  Convert bitmap images to SVG")
 if(WIN32 AND BUILD_THUMBNAIL_PROVIDER)
   message(STATUS "  - HVIFThumbnailProvider: Windows thumbnail provider for HVIF files")
