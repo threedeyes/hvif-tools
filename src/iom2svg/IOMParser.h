@@ -17,6 +17,7 @@ public:
 	~IOMParser();
 
 	bool				ParseFile(const std::string& filename);
+	bool				ParseMessage(const BMessage& message);
 	
 	const Icon&			GetIcon() const { return *fIcon; }
 	Icon* 				TakeIcon() { Icon* icon = fIcon; fIcon = NULL; return icon; }

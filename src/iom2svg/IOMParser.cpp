@@ -73,6 +73,18 @@ IOMParser::ParseFile(const std::string& filename)
 }
 
 bool
+IOMParser::ParseMessage(const BMessage& message)
+{
+	delete fIcon;
+	fIcon = new Icon();
+	fIcon->filename = "<from memory>";
+
+	fLastError.clear();
+
+	return _ParseMessage(message);
+}
+
+bool
 IOMParser::_ParseMessage(const BMessage& message)
 {
 	BMessage stylesContainer, pathsContainer, shapesContainer;
