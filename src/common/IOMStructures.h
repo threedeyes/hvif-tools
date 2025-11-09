@@ -39,6 +39,10 @@ struct ColorStop {
 	float offset;
 	
 	ColorStop() : color(0), offset(0.0f) {}
+
+	bool operator==(const ColorStop& other) const {
+		return color == other.color && offset == other.offset;
+	}
 };
 
 struct Gradient {
@@ -51,6 +55,15 @@ struct Gradient {
 	
 	Gradient() : type(GRADIENT_LINEAR), interpolation(INTERPOLATION_LINEAR),
 		inheritTransformation(true), hasTransform(false) {}
+
+	bool operator==(const Gradient& other) const {
+		return type == other.type &&
+			   interpolation == other.interpolation &&
+			   inheritTransformation == other.inheritTransformation &&
+			   stops == other.stops &&
+			   transform == other.transform &&
+			   hasTransform == other.hasTransform;
+	}
 };
 
 struct Style {
@@ -60,6 +73,16 @@ struct Style {
 	std::string name;
 	
 	Style() : isGradient(false), color(0xFF000000) {}
+
+	bool operator==(const Style& other) const {
+		if (isGradient != other.isGradient)
+			return false;
+		if (name != other.name)
+			return false;
+		if (isGradient)
+			return gradient == other.gradient;
+		return color == other.color;
+	}
 };
 
 struct ControlPoint {
@@ -69,6 +92,13 @@ struct ControlPoint {
 	bool connected;
 	
 	ControlPoint() : x(0), y(0), x_in(0), y_in(0), x_out(0), y_out(0), connected(true) {}
+
+	bool operator==(const ControlPoint& other) const {
+		return x == other.x && y == other.y &&
+			   x_in == other.x_in && y_in == other.y_in &&
+			   x_out == other.x_out && y_out == other.y_out &&
+			   connected == other.connected;
+	}
 };
 
 struct Path {
@@ -77,6 +107,12 @@ struct Path {
 	std::string name;
 	
 	Path() : closed(false) {}
+
+	bool operator==(const Path& other) const {
+		return points == other.points &&
+			   closed == other.closed &&
+			   name == other.name;
+	}
 };
 
 struct Transformer {
@@ -89,6 +125,15 @@ struct Transformer {
 	
 	Transformer() : type(TRANSFORMER_AFFINE), width(1.0), 
 		lineJoin(0), lineCap(0), miterLimit(4.0) {}
+
+	bool operator==(const Transformer& other) const {
+		return type == other.type &&
+			   matrix == other.matrix &&
+			   width == other.width &&
+			   lineJoin == other.lineJoin &&
+			   lineCap == other.lineCap &&
+			   miterLimit == other.miterLimit;
+	}
 };
 
 struct Shape {
@@ -105,6 +150,19 @@ struct Shape {
 
 	Shape() : what(0), styleIndex(0), hasTransform(false), 
 		hinting(false), minVisibility(0.0f), maxVisibility(4.0f) {}
+
+	bool operator==(const Shape& other) const {
+		return what == other.what &&
+			   pathIndices == other.pathIndices &&
+			   styleIndex == other.styleIndex &&
+			   transform == other.transform &&
+			   hasTransform == other.hasTransform &&
+			   hinting == other.hinting &&
+			   minVisibility == other.minVisibility &&
+			   maxVisibility == other.maxVisibility &&
+			   transformers == other.transformers &&
+			   name == other.name;
+	}
 };
 
 struct Icon {
