@@ -11,6 +11,13 @@
 #include <string>
 #include <cstring>
 
+#ifdef _WIN32
+#include <BaseTsd.h>
+typedef SSIZE_T ssize_t;
+#else
+#include <sys/types.h>
+#endif
+
 typedef int32_t status_t;
 typedef int64_t bigtime_t;
 
