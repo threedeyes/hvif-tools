@@ -27,6 +27,7 @@ target_include_directories(HVIFThumbnailProvider PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/src/hvif2svg
     ${CMAKE_SOURCE_DIR}/src/iom2svg
+    ${CMAKE_SOURCE_DIR}/src
 )
 
 target_link_libraries(HVIFThumbnailProvider PRIVATE
