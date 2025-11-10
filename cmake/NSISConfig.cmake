@@ -42,6 +42,9 @@ set(CPACK_COMPONENT_INKSCAPE_DISPLAY_NAME "Inkscape Extensions")
 set(CPACK_COMPONENT_INKSCAPE_DESCRIPTION "Import/Export extensions for Inkscape (HVIF and IOM formats)")
 set(CPACK_COMPONENT_INKSCAPE_REQUIRED OFF)
 
+# Disable Start Menu folder creation
+set(CPACK_NSIS_MENU_LINKS "")
+
 set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "
     WriteRegStr HKCR '.hvif' '' 'HVIFFile'
     WriteRegStr HKCR 'HVIFFile' '' 'Haiku Vector Icon Format'
@@ -62,57 +65,45 @@ set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "
 if(BUILD_HVIF4WIN)
     set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
     
-    SectionGetFlags \${windows} $0
-    IntOp $0 $0 & \${SF_SELECTED}
-    IntCmp $0 0 +2 0
+    IfFileExists '$INSTDIR\\\\bin\\\\HVIFThumbnailProvider.dll' 0 +2
         ExecWait 'regsvr32 /s \\\"$INSTDIR\\\\bin\\\\HVIFThumbnailProvider.dll\\\"'
     ")
     
     set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "${CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS}
     
-    IfFileExists \\\"$INSTDIR\\\\bin\\\\HVIFThumbnailProvider.dll\\\" 0 +2
+    IfFileExists '$INSTDIR\\\\bin\\\\HVIFThumbnailProvider.dll' 0 +2
         ExecWait 'regsvr32 /u /s \\\"$INSTDIR\\\\bin\\\\HVIFThumbnailProvider.dll\\\"'
     ")
 endif()
 
 set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
     
-    SectionGetFlags \${inkscape} $0
-    IntOp $0 $0 & \${SF_SELECTED}
-    IntCmp $0 0 skip_inkscape 0
+    IfFileExists '$INSTDIR\\\\share\\\\inkscape\\\\hvif_input.py' 0 skip_inkscape_install
     
-    StrCpy $1 \\\"$APPDATA\\\\inkscape\\\\extensions\\\"
-    CreateDirectory $1
+    StrCpy \$1 '$APPDATA\\\\inkscape\\\\extensions'
+    CreateDirectory '\$1'
     
-    SetOutPath $1
-    File \\\"$INSTDIR\\\\share\\\\inkscape\\\\hvif_input.py\\\"
-    File \\\"$INSTDIR\\\\share\\\\inkscape\\\\hvif_input.inx\\\"
-    File \\\"$INSTDIR\\\\share\\\\inkscape\\\\hvif_output.py\\\"
-    File \\\"$INSTDIR\\\\share\\\\inkscape\\\\hvif_output.inx\\\"
-    File \\\"$INSTDIR\\\\share\\\\inkscape\\\\iom_input.py\\\"
-    File \\\"$INSTDIR\\\\share\\\\inkscape\\\\iom_input.inx\\\"
-    File \\\"$INSTDIR\\\\share\\\\inkscape\\\\iom_output.py\\\"
-    File \\\"$INSTDIR\\\\share\\\\inkscape\\\\iom_output.inx\\\"
+    CopyFiles '$INSTDIR\\\\share\\\\inkscape\\\\*.py' '\$1'
+    CopyFiles '$INSTDIR\\\\share\\\\inkscape\\\\*.inx' '\$1'
     
-    WriteRegStr HKCU 'Software\\\\hvif-tools' 'InkscapeExtPath' $1
+    WriteRegStr HKCU 'Software\\\\hvif-tools' 'InkscapeExtPath' '\$1'
     
-    skip_inkscape:
-    SetOutPath $INSTDIR
+    skip_inkscape_install:
 ")
 
 set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "${CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS}
     
-    ReadRegStr $1 HKCU 'Software\\\\hvif-tools' 'InkscapeExtPath'
-    StrCmp $1 \\\"\\\" skip_uninst_inkscape
+    ReadRegStr \$1 HKCU 'Software\\\\hvif-tools' 'InkscapeExtPath'
+    StrCmp '\$1' '' skip_uninst_inkscape
     
-    Delete \\\"$1\\\\hvif_input.py\\\"
-    Delete \\\"$1\\\\hvif_input.inx\\\"
-    Delete \\\"$1\\\\hvif_output.py\\\"
-    Delete \\\"$1\\\\hvif_output.inx\\\"
-    Delete \\\"$1\\\\iom_input.py\\\"
-    Delete \\\"$1\\\\iom_input.inx\\\"
-    Delete \\\"$1\\\\iom_output.py\\\"
-    Delete \\\"$1\\\\iom_output.inx\\\"
+    Delete '\$1\\\\hvif_input.py'
+    Delete '\$1\\\\hvif_input.inx'
+    Delete '\$1\\\\hvif_output.py'
+    Delete '\$1\\\\hvif_output.inx'
+    Delete '\$1\\\\iom_input.py'
+    Delete '\$1\\\\iom_input.inx'
+    Delete '\$1\\\\iom_output.py'
+    Delete '\$1\\\\iom_output.inx'
     
     DeleteRegKey HKCU 'Software\\\\hvif-tools'
     
