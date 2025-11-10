@@ -54,23 +54,20 @@ if(WIN32 AND TARGET HVIFThumbnailProvider)
         LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
         COMPONENT windows
     )
-    
-    message(STATUS "Windows thumbnail provider will be installed.")
-    message(STATUS "Use an installer (NSIS/WiX) to register the COM component.")
 endif()
 
-install(FILES
-    "${CMAKE_SOURCE_DIR}/README.md"
-    DESTINATION ${CMAKE_INSTALL_DOCDIR}
-    COMPONENT documentation
-    OPTIONAL
-)
-
-if(EXISTS "${CMAKE_SOURCE_DIR}/LICENSE")
+if(WIN32)
     install(FILES
-        "${CMAKE_SOURCE_DIR}/LICENSE"
-        DESTINATION ${CMAKE_INSTALL_DOCDIR}
-        COMPONENT documentation
+        "${CMAKE_SOURCE_DIR}/inkscape/hvif_input.py"
+        "${CMAKE_SOURCE_DIR}/inkscape/hvif_input.inx"
+        "${CMAKE_SOURCE_DIR}/inkscape/hvif_output.py"
+        "${CMAKE_SOURCE_DIR}/inkscape/hvif_output.inx"
+        "${CMAKE_SOURCE_DIR}/inkscape/iom_input.py"
+        "${CMAKE_SOURCE_DIR}/inkscape/iom_input.inx"
+        "${CMAKE_SOURCE_DIR}/inkscape/iom_output.py"
+        "${CMAKE_SOURCE_DIR}/inkscape/iom_output.inx"
+        DESTINATION share/inkscape
+        COMPONENT inkscape
     )
 endif()
 
@@ -78,24 +75,17 @@ set(CPACK_PACKAGE_NAME "hvif-tools")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_VENDOR "Haiku")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
-set(CPACK_COMPONENTS_ALL tools documentation)
+set(CPACK_COMPONENTS_ALL tools)
 
 if(EXISTS "${CMAKE_SOURCE_DIR}/LICENSE")
     set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
 endif()
 
-if(EXISTS "${CMAKE_SOURCE_DIR}/README.md")
-    set(CPACK_RESOURCE_FILE_README "${CMAKE_SOURCE_DIR}/README.md")
-endif()
-
 if(WIN32)
     set(CPACK_GENERATOR "ZIP;NSIS")
-    list(APPEND CPACK_COMPONENTS_ALL windows)
+    list(APPEND CPACK_COMPONENTS_ALL windows inkscape)
     
-    set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
-    set(CPACK_NSIS_MODIFY_PATH ON)
-    set(CPACK_NSIS_DISPLAY_NAME "HVIF Tools")
-    set(CPACK_NSIS_PACKAGE_NAME "HVIF Tools")
+    include(NSISConfig)
     
 elseif(HAIKU)
     set(CPACK_GENERATOR "TGZ;HPKG")
