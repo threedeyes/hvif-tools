@@ -9,9 +9,14 @@ if(NOT BUILD_INKSCAPE_EXTENSIONS)
     return()
 endif()
 
+# For Windows, extensions are packaged in share/inkscape and installed by NSIS
+# For other platforms, install directly to Inkscape extensions directory
 if(WIN32)
-    set(_default_ext_dir "$ENV{APPDATA}/inkscape/extensions")
-elseif(APPLE)
+    message(STATUS "Inkscape extensions will be packaged for NSIS installer")
+    return()
+endif()
+
+if(APPLE)
     set(_default_ext_dir "$ENV{HOME}/Library/Application Support/org.inkscape.Inkscape/config/inkscape/extensions")
 elseif(HAIKU)
     set(_default_ext_dir "$ENV{HOME}/config/settings/inkscape/extensions")
