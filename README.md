@@ -38,10 +38,9 @@ A comprehensive set of command-line tools and extensions for working with Haiku 
 **img2svg** - Advanced bitmap to SVG vectorization
 - Color quantization with adaptive palettes
 - Multiple simplification algorithms (Douglas-Peucker, Visvalingam-Whyatt)
-- Geometric shape detection (lines, circles, rectangles)
+- Geometric shape detection
 - Background removal with auto-detection
 - Gradient detection and region merging
-- Multi-threaded processing
 
 ### Integration
 
@@ -50,15 +49,15 @@ A comprehensive set of command-line tools and extensions for working with Haiku 
 - Requires corresponding CLI tools in PATH
 
 **Windows Thumbnail Provider** - Explorer integration
-- COM-based thumbnail generation for HVIF files
-- Requires registration via installer or regsvr32
+- COM-based thumbnail generation for HVIF and IOM files
+- Requires registration via regsvr32
 
 ### Development Tools
 
 **msg2txt** - BMessage binary format dump utility
 - Structure and field enumeration
 - Optional value display and hex dump
-- Offset-based reading for debugging
+- Offset-based reading
 
 ## Building
 
@@ -105,7 +104,6 @@ cmake --build .
 **Development:**
 - `HVIF_TOOLS_WARNINGS` - Enable extra compiler warnings (default: OFF)
 - `HVIF_TOOLS_WERROR` - Treat warnings as errors (default: OFF)
-- `HVIF_TOOLS_SANITIZERS` - Enable ASan/UBSan (default: OFF)
 
 ### Build Examples
 
@@ -133,7 +131,7 @@ cmake --install build
 
 Development build:
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Debug -DHVIF_TOOLS_WARNINGS=ON -DHVIF_TOOLS_SANITIZERS=ON
+cmake -B build -DCMAKE_BUILD_TYPE=Debug -DHVIF_TOOLS_WARNINGS=ON
 cmake --build build
 ```
 
@@ -142,11 +140,6 @@ cmake --build build
 System-wide:
 ```bash
 cmake --install build --prefix /usr/local
-```
-
-Create package:
-```bash
-cmake --build build --target package
 ```
 
 ### Inkscape Extensions Installation
@@ -263,15 +256,15 @@ Processed 2 file(s): 2 succeeded, 0 failed
 ```bash
 img2svg photo.jpg vector.svg --colors 32 --scale 2
 img2svg logo.png logo.svg --remove_bg 1 --detect_geometry 1
-img2svg --help  # Show all options
+img2svg --help
 ```
 
 ### Debug BMessage
 
 ```bash
-msg2txt icon.iom          # Show structure
-msg2txt -v icon.iom       # Show with values
-msg2txt -x icon.iom       # Hex dump
+msg2txt example.msg       # Show BMessage structure
+msg2txt -o 4 -v icon.iom  # Show IOM BMessage structure with values
+msg2txt -x example.msg    # Hex dump
 ```
 
 ## Platform Notes
@@ -313,8 +306,6 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ```
 
-**Note:** Haiku builds automatically use position-independent code. The build system is compatible with legacy GCC 2.96+ compilers. The `iom2hvif` tool is only available on Haiku as it uses native Haiku APIs and libraries.
-
 ## Technical Details
 
 ### HVIF Format
@@ -336,7 +327,6 @@ cmake --build build
 On Haiku, icons can be stored as file attributes (metadata). The `iom2hvif` tool supports writing HVIF data to:
 - **BEOS:ICON** (default) - Standard Haiku vector icon attribute
 - Custom attribute names via `--attr-name` option
-- Works with files, folders, and applications
 
 ## License
 
