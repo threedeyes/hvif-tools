@@ -47,24 +47,10 @@ set(IOM_EXTENSION_FILES
 install(FILES
     ${HVIF_EXTENSION_FILES}
     ${IOM_EXTENSION_FILES}
+    PERMISSIONS OWNER_EXECUTE OWNER_READ
     DESTINATION ${INKSCAPE_EXT_DIR}
     COMPONENT inkscape
 )
-
-if(UNIX)
-    install(CODE "
-        file(CHMOD 
-            \${CMAKE_INSTALL_PREFIX}/${INKSCAPE_EXT_DIR}/hvif_input.py
-            \${CMAKE_INSTALL_PREFIX}/${INKSCAPE_EXT_DIR}/hvif_output.py
-            \${CMAKE_INSTALL_PREFIX}/${INKSCAPE_EXT_DIR}/iom_input.py
-            \${CMAKE_INSTALL_PREFIX}/${INKSCAPE_EXT_DIR}/iom_output.py
-            PERMISSIONS 
-                OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                GROUP_READ GROUP_EXECUTE
-                WORLD_READ WORLD_EXECUTE
-        )
-    " COMPONENT inkscape)
-endif()
 
 message(STATUS "Inkscape extensions require the following CLI tools:")
 message(STATUS "  hvif2svg, svg2hvif (for HVIF format)")
