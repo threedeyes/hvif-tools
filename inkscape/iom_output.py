@@ -8,7 +8,6 @@ import inkex
 
 class IOMOutput(inkex.OutputExtension):
     def save(self, stream):
-        # Проверка наличия утилиты
         if not shutil.which('svg2iom'):
             raise inkex.AbortExtension(
                 "svg2iom utility not found. Please install Icon-O-Matic tools."
