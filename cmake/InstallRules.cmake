@@ -44,15 +44,14 @@ endif()
 if(TOOLS_TO_INSTALL)
     install(TARGETS ${TOOLS_TO_INSTALL}
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        COMPONENT tools
+        COMPONENT a_tools
     )
 endif()
 
 if(WIN32 AND TARGET HVIFThumbnailProvider)
-    install(TARGETS HVIFThumbnailProvider
-        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-        LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-        COMPONENT windows
+    install(FILES $<TARGET_FILE:HVIFThumbnailProvider>
+        DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT b_windows
     )
 endif()
 
@@ -67,15 +66,31 @@ if(WIN32)
         "${CMAKE_SOURCE_DIR}/inkscape/iom_output.py"
         "${CMAKE_SOURCE_DIR}/inkscape/iom_output.inx"
         DESTINATION share/inkscape
-        COMPONENT inkscape
+        COMPONENT c_inkscape
     )
+endif()
+
+# Install file type icons on Windows
+if(WIN32)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/installer/hvif-file.ico")
+        install(FILES "${CMAKE_SOURCE_DIR}/installer/hvif-file.ico"
+            DESTINATION installer
+            COMPONENT a_tools
+        )
+    endif()
+    
+    if(EXISTS "${CMAKE_SOURCE_DIR}/installer/iom-file.ico")
+        install(FILES "${CMAKE_SOURCE_DIR}/installer/iom-file.ico"
+            DESTINATION installer
+            COMPONENT a_tools
+        )
+    endif()
 endif()
 
 set(CPACK_PACKAGE_NAME "hvif-tools")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
 set(CPACK_PACKAGE_VENDOR "Haiku")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
-set(CPACK_COMPONENTS_ALL tools)
 
 if(EXISTS "${CMAKE_SOURCE_DIR}/LICENSE")
     set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_SOURCE_DIR}/LICENSE")
@@ -83,18 +98,36 @@ endif()
 
 if(WIN32)
     set(CPACK_GENERATOR "ZIP;NSIS")
-    list(APPEND CPACK_COMPONENTS_ALL windows inkscape)
     
     include(NSISConfig)
     
-elseif(HAIKU)
-    set(CPACK_GENERATOR "TGZ;HPKG")
 else()
     set(CPACK_GENERATOR "TGZ;DEB")
     
-    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "hvif-tools developers")
+    set(CPACK_DEBIAN_PACKAGE_MAINTAINER "hvif-tools developer")
     set(CPACK_DEBIAN_PACKAGE_SECTION "graphics")
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libstdc++6")
 endif()
 
+# Include CPack and define components
 include(CPack)
+
+cpack_add_component(a_tools
+    DISPLAY_NAME "Command-line Tools"
+    DESCRIPTION "HVIF/IOM/SVG conversion utilities"
+    REQUIRED)
+
+if(WIN32 AND TARGET HVIFThumbnailProvider)
+    cpack_add_component(b_windows
+        DISPLAY_NAME "Thumbnail provider"
+        DESCRIPTION "Thumbnail provider for HVIF and IOM files"
+        DEPENDS a_tools)
+endif()
+
+if(WIN32)
+    cpack_add_component(c_inkscape
+        DISPLAY_NAME "Inkscape Extensions"
+        DESCRIPTION "Import/Export extensions for Inkscape (requires Inkscape installed)"
+        DISABLED
+        DEPENDS a_tools)
+endif()
