@@ -77,7 +77,7 @@ Platform-specific dependencies:
 ### Quick Start
 
 ```bash
-git clone https://github.com/your-org/hvif-tools.git --recursive
+git clone https://github.com/threedeyes/hvif-tools.git --recursive
 cd hvif-tools
 mkdir build && cd build
 cmake -DCMAKE_BUILD_TYPE=Release ..
@@ -135,6 +135,14 @@ cmake -B build -DCMAKE_BUILD_TYPE=Debug -DHVIF_TOOLS_WARNINGS=ON
 cmake --build build
 ```
 
+Build full installation package for Windows:
+```bash
+cmake -B build -DBUILD_INKSCAPE_EXTENSIONS=ON -DBUILD_MSG2TXT=ON
+cd build
+cmake --build . --config=Release
+cpack -C Release -G NSIS
+```
+
 ## Installation
 
 System-wide:
@@ -165,11 +173,6 @@ cmake --install build
 Copy extension files directly:
 ```bash
 cp inkscape/*.{py,inx} <inkscape-extensions-dir>/
-```
-
-On Unix-like systems, make Python scripts executable:
-```bash
-chmod +x <inkscape-extensions-dir>/*.py
 ```
 
 ## Usage
