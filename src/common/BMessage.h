@@ -394,7 +394,6 @@ private:
 				R5_FIELD_FLAG_SINGLE_ITEM		= 0x08
 			};
 
-#pragma pack(push, 1)
 			struct message_header {
 				uint32_t	format;
 				uint32_t	flags;
@@ -409,7 +408,7 @@ private:
 				uint32_t	field_count;
 				uint32_t	hash_table_size;
 				int32_t		hash_table[5];
-			};
+			} __attribute__((packed));
 
 			struct field_header {
 				uint16_t	flags;
@@ -419,17 +418,15 @@ private:
 				uint32_t	data_size;
 				uint32_t	offset;
 				int32_t		next_field;
-			};
+			} __attribute__((packed));
 
-			// R5 format header (completely different!)
 			struct r5_message_header {
 				uint32_t	magic;
 				uint32_t	checksum;
 				int32_t		flattened_size;
 				int32_t		what;
 				uint8_t		flags;
-			};
-#pragma pack(pop)
+			} __attribute__((packed));
 
 			message_header*		fHeader;
 			field_header*		fFields;
