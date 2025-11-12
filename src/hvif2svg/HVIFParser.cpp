@@ -250,6 +250,9 @@ HVIFParser::_ReadShape(Shape& shape)
 		if (!_ReadByte(min) || !_ReadByte(max)) {
 			return false;
 		}
+		shape.minLOD = min;
+		shape.maxLOD = max;
+		shape.hasLOD = true;
 	}
 
 	if (flags & TRANSFORMERS) {

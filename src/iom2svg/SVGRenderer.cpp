@@ -44,6 +44,9 @@ SVGRenderer::RenderIcon(const Icon& icon, int width, int height)
 		<< "\" viewBox=\"0 0 64 64\" xmlns=\"http://www.w3.org/2000/svg\">\n";
 
 	for (size_t i = 0; i < icon.shapes.size(); i++) {
+		if (icon.shapes[i].maxVisibility < 3.99f)
+			continue;
+
 		svg << _ShapeToSVG(icon.shapes[i], icon, static_cast<int>(i));
 	}
 
@@ -177,10 +180,14 @@ SVGRenderer::_ShapeToSVG(const Shape& shape, const Icon& icon, int shapeIndex)
 
 	for (size_t i = 0; i < shape.transformers.size(); i++) {
 		const Transformer& trans = shape.transformers[i];
-		if (trans.type == TRANSFORMER_STROKE || trans.type == TRANSFORMER_CONTOUR) {
+		if (trans.type == TRANSFORMER_STROKE) {
 			isStroke = true;
 			strokeTrans = trans;
 			break;
+		} else if (trans.type == TRANSFORMER_CONTOUR) {
+			// TODO: SVG has no direct equivalent for CONTOUR transformer
+			// (path offset/expand). Shape is rendered as-is without this effect.
+			continue;
 		}
 	}
 

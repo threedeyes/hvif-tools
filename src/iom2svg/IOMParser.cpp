@@ -278,6 +278,13 @@ IOMParser::_ParseShape(const BMessage& shapeMsg, Shape& shape)
 	if (shapeMsg.FindBool("hinting", &hinting) == B_OK)
 		shape.hinting = hinting;
 
+	float minVis, maxVis;
+	if (shapeMsg.FindFloat("min visibility scale", &minVis) == B_OK)
+		shape.minVisibility = minVis;
+
+	if (shapeMsg.FindFloat("max visibility scale", &maxVis) == B_OK)
+		shape.maxVisibility = maxVis;
+
 	int32_t transCount = 0;
 	shapeMsg.GetInfo("transformer", NULL, &transCount);
 	for (int32_t i = 0; i < transCount; i++) {
@@ -312,6 +319,12 @@ IOMParser::_ParseTransformer(const BMessage& transMsg, Transformer& transformer)
 			transformer.lineJoin = lineJoin;
 		if (transMsg.FindDouble("miter limit", &miterLimit) == B_OK)
 			transformer.miterLimit = miterLimit;
+	} else if (name == "Contour") {
+		transformer.type = TRANSFORMER_CONTOUR;
+
+		double width;
+		if (transMsg.FindDouble("width", &width) == B_OK)
+			transformer.width = width;
 	}
 
 	return true;

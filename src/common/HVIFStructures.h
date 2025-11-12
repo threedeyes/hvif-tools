@@ -184,8 +184,11 @@ struct Shape {
 	std::string transformType;
 	std::vector<Transformer> transformers;
 	bool hasTransform;
+	uint8_t minLOD;
+	uint8_t maxLOD;
+	bool hasLOD;
 
-	Shape() : styleIndex(0), hasTransform(false) {}
+	Shape() : styleIndex(0), hasTransform(false), minLOD(0), maxLOD(255), hasLOD(false) {}
 
 	bool operator==(const Shape& other) const {
 		return styleIndex == other.styleIndex &&
@@ -193,7 +196,10 @@ struct Shape {
 			   transform == other.transform &&
 			   transformType == other.transformType &&
 			   transformers == other.transformers &&
-			   hasTransform == other.hasTransform;
+			   hasTransform == other.hasTransform &&
+			   minLOD == other.minLOD &&
+			   maxLOD == other.maxLOD &&
+			   hasLOD == other.hasLOD;
 	}
 };
 

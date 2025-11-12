@@ -72,6 +72,11 @@ SVGRenderer::RenderIcon(const HVIFIcon& icon, int width, int height)
 		<< "\" viewBox=\"0 0 6528 6528\" xmlns=\"http://www.w3.org/2000/svg\">\n";
 
 	for (size_t i = 0; i < icon.shapes.size(); i++) {
+		if (icon.shapes[i].hasLOD) {
+			if (icon.shapes[i].maxLOD < 255)
+				continue;
+		}
+
 		svg << _ShapeToSVG(icon.shapes[i], icon, id, static_cast<int>(i));
 	}
 
@@ -225,15 +230,9 @@ SVGRenderer::_ShapeToSVG(const Shape& shape, const HVIFIcon& icon,
 			hasStroke = true;
 			break;
 		} else if (transformer.tag == CONTOUR) {
-			if (opacity >= 1.0f - 1e-6f) {
-				effectType = "stroke";
-				strokeEffect = transformer;
-				hasStroke = true;
-				break;
-			} else {
-				// Ignore contour for transparent shapes
-				continue;
-			}
+			// TODO: SVG has no direct equivalent for CONTOUR transformer
+			// (path offset/expand). Shape is rendered as-is without this effect.
+			continue;
 		}
 	}
 
