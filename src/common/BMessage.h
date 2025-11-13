@@ -394,6 +394,10 @@ private:
 				R5_FIELD_FLAG_SINGLE_ITEM		= 0x08
 			};
 
+#ifdef _MSC_VER
+#pragma pack(push, 1)
+#endif
+
 			struct message_header {
 				uint32_t	format;
 				uint32_t	flags;
@@ -408,7 +412,12 @@ private:
 				uint32_t	field_count;
 				uint32_t	hash_table_size;
 				int32_t		hash_table[5];
-			} __attribute__((packed));
+			}
+#ifndef _MSC_VER
+			__attribute__((packed))
+#endif
+			;
+
 
 			struct field_header {
 				uint16_t	flags;
@@ -418,7 +427,11 @@ private:
 				uint32_t	data_size;
 				uint32_t	offset;
 				int32_t		next_field;
-			} __attribute__((packed));
+			}
+#ifndef _MSC_VER
+			__attribute__((packed))
+#endif
+			;
 
 			struct r5_message_header {
 				uint32_t	magic;
@@ -426,7 +439,15 @@ private:
 				int32_t		flattened_size;
 				int32_t		what;
 				uint8_t		flags;
-			} __attribute__((packed));
+			}
+#ifndef _MSC_VER
+			__attribute__((packed))
+#endif
+			;
+
+#ifdef _MSC_VER
+#pragma pack(pop)
+#endif
 
 			message_header*		fHeader;
 			field_header*		fFields;
