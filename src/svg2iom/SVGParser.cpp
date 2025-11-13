@@ -3,11 +3,13 @@
  * Distributed under the terms of the MIT License.
  */
 
-#include "SVGParser.h"
-#include "nanosvg.h"
 #include <iostream>
 #include <cmath>
 #include <algorithm>
+
+#include "nanosvg.h"
+
+#include "SVGParser.h"
 
 namespace iom {
 
@@ -215,47 +217,20 @@ SVGParser::_ProcessPath(NSVGpath* path, ConvertState& state)
 	}
 
 	if (iomPath.closed && iomPath.points.size() > 1) {
-		ControlPoint& first = iomPath.points[0];
+		if (path->npts >= 4) {
+			float* last_segment_pts = &path->pts[(path->npts - 4) * 2];
+			if (last_segment_pts + 5 < &path->pts[path->npts * 2]) {
+				iomPath.points[0].x_in = last_segment_pts[4] * state.scale + state.tx;
+				iomPath.points[0].y_in = last_segment_pts[5] * state.scale + state.ty;
+			}
+		}
+
+		const ControlPoint& first = iomPath.points[0];
 		ControlPoint& last = iomPath.points[iomPath.points.size() - 1];
-		
-		float dx = first.x - last.x;
-		float dy = first.y - last.y;
-		bool hasClosingPoint = (std::fabs(dx) < 0.01f && std::fabs(dy) < 0.01f);
-		
-		if (hasClosingPoint) {
-			while (iomPath.points.size() > 2) {
-				size_t lastIdx = iomPath.points.size() - 1;
-				size_t prevIdx = lastIdx - 1;
-				
-				ControlPoint& lastPt = iomPath.points[lastIdx];
-				ControlPoint& prevPt = iomPath.points[prevIdx];
-				
-				float dx2 = lastPt.x - prevPt.x;
-				float dy2 = lastPt.y - prevPt.y;
-				
-				if (std::fabs(dx2) >= 0.01f || std::fabs(dy2) >= 0.01f)
-					break;
-				
-				iomPath.points.pop_back();
-			}
-			
-			ControlPoint& finalFirst = iomPath.points[0];
-			ControlPoint& finalLast = iomPath.points[iomPath.points.size() - 1];
-			
-			finalFirst.x_in = finalFirst.x;
-			finalFirst.y_in = finalFirst.y;
-			
-			for (int i = 0; i < 2; i++) {
-				ControlPoint duplicate;
-				duplicate.x = finalFirst.x;
-				duplicate.y = finalFirst.y;
-				duplicate.x_in = finalFirst.x;
-				duplicate.y_in = finalFirst.y;
-				duplicate.x_out = finalFirst.x;
-				duplicate.y_out = finalFirst.y;
-				duplicate.connected = false;
-				iomPath.points.push_back(duplicate);
-			}
+		if (std::fabs(first.x - last.x) < 0.01f && std::fabs(first.y - last.y) < 0.01f) {
+			iomPath.points[0].x_in = last.x_in;
+			iomPath.points[0].y_in = last.y_in;
+			iomPath.points.pop_back();
 		}
 	}
 
