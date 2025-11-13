@@ -8,15 +8,9 @@
 #include <iostream>
 
 #include "IOMParser.h"
+#include "Utils.h"
 
 namespace iom {
-
-template<typename T>
-std::string ToString(T value) {
-	std::ostringstream oss;
-	oss << value;
-	return oss.str();
-}
 
 IOMParser::IOMParser()
 	: fIcon(NULL)

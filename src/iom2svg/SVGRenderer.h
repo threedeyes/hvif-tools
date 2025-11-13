@@ -26,8 +26,6 @@ private:
 	std::string		_PathToSVG(const Path& path);
 	std::string		_ShapeToSVG(const Shape& shape, const Icon& icon, int shapeIndex);
 	std::string		_TransformToSVG(const std::vector<double>& matrix);
-	std::string		_GetLineJoinName(int32_t lineJoin);
-	std::string		_GetLineCapName(int32_t lineCap);
 	std::string		_GenerateID();
 
 	int				fIdCounter;

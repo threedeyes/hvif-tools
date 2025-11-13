@@ -28,8 +28,6 @@ private:
 	std::string _TransformToSVG(const std::vector<float>& transform, 
 							const std::string& type);
 	std::string _MatrixToSVG(const std::vector<float>& matrix);
-	std::string _GetLineJoinName(uint8_t lineJoin);
-	std::string _GetLineCapName(uint8_t lineCap);
 	std::string _GenerateID();
 
 	int fIdCounter;

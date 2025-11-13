@@ -1,4 +1,3 @@
-// Filename: ./svg2hvif/HVIFWriter.cpp
 /*
  * Copyright 2025, Gerasim Troeglazov, 3dEyes@gmail.com. All rights reserved.
  * Distributed under the terms of the MIT License.
@@ -10,17 +9,9 @@
 #include <cstring>
 
 #include "HVIFWriter.h"
+#include "Utils.h"
 
 namespace hvif {
-
-template<typename T>
-static T clamp_value(const T& value, const T& min_val, const T& max_val) {
-	return (value < min_val) ? min_val : (value > max_val) ? max_val : value;
-}
-
-static long round_to_long(double x) {
-	return static_cast<long>(x + (x >= 0 ? 0.5 : -0.5));
-}
 
 bool
 HVIFWriter::CheckHVIFLimitations() const
@@ -265,10 +256,10 @@ HVIFWriter::_WriteInternalPathData(std::vector<uint8_t>& buffer, const InternalP
 			size_t node_idx = i * 4 + j;
 			if (node_idx < path.nodes.size()) {
 				const PathNode& node = path.nodes[node_idx];
-				bool isLine = (fabs(node.x - node.x_in) < 1e-3 && 
-							  fabs(node.y - node.y_in) < 1e-3 &&
-							  fabs(node.x - node.x_out) < 1e-3 && 
-							  fabs(node.y - node.y_out) < 1e-3);
+				bool isLine = (utils::FloatEqual(node.x, node.x_in) &&
+							  utils::FloatEqual(node.y, node.y_in) &&
+							  utils::FloatEqual(node.x, node.x_out) &&
+							  utils::FloatEqual(node.y, node.y_out));
 				byte |= ((isLine ? CMD_LINE : CMD_CURVE) << (j * 2));
 			}
 		}
@@ -277,10 +268,10 @@ HVIFWriter::_WriteInternalPathData(std::vector<uint8_t>& buffer, const InternalP
 
 	for (size_t i = 0; i < path.nodes.size(); ++i) {
 		const PathNode& node = path.nodes[i];
-		bool isLine = (fabs(node.x - node.x_in) < 1e-3 && 
-					  fabs(node.y - node.y_in) < 1e-3 &&
-					  fabs(node.x - node.x_out) < 1e-3 && 
-					  fabs(node.y - node.y_out) < 1e-3);
+		bool isLine = (utils::FloatEqual(node.x, node.x_in) &&
+					  utils::FloatEqual(node.y, node.y_in) &&
+					  utils::FloatEqual(node.x, node.x_out) &&
+					  utils::FloatEqual(node.y, node.y_out));
 		if (isLine) {
 			_WriteCoord(buffer, node.x);
 			_WriteCoord(buffer, node.y);
@@ -318,8 +309,8 @@ HVIFWriter::_WriteShapeData(std::vector<uint8_t>& buffer, const Shape& shape)
 			const Transformer& t = shape.transformers[i];
 			_WriteByte(buffer, static_cast<uint8_t>(t.tag));
 
-			int encodedWidth = static_cast<int>(round_to_long(t.width)) + 128;
-			encodedWidth = clamp_value(encodedWidth, 0, 255);
+			int encodedWidth = static_cast<int>(utils::RoundToLong(t.width)) + 128;
+			encodedWidth = utils::clamp(encodedWidth, 0, 255);
 			if (encodedWidth == 128 && t.width > 0.0f)
 				encodedWidth = 129;
 			_WriteByte(buffer, static_cast<uint8_t>(encodedWidth));
@@ -328,7 +319,7 @@ HVIFWriter::_WriteShapeData(std::vector<uint8_t>& buffer, const Shape& shape)
 			_WriteByte(buffer, lineOptions);
 
 			uint8_t encodedMiter = static_cast<uint8_t>(
-				clamp_value<int>(static_cast<int>(round_to_long(t.miterLimit)), 0, 255)
+				utils::clamp<int>(static_cast<int>(utils::RoundToLong(t.miterLimit)), 0, 255)
 			);
 			_WriteByte(buffer, encodedMiter);
 		}

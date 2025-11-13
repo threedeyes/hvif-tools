@@ -9,50 +9,9 @@
 #include <cstdlib>
 
 #include "SVGRenderer.h"
+#include "Utils.h"
 
 namespace hvif {
-
-template<typename T>
-std::string ToString(T value) {
-	std::ostringstream oss;
-	oss << value;
-	return oss.str();
-}
-
-static inline std::string FormatFixed(double value, int precision)
-{
-	std::ostringstream oss;
-	oss.setf(std::ios::fixed, std::ios::floatfield);
-	oss.precision(precision);
-	oss << value;
-	return oss.str();
-}
-
-static inline bool IsLinearCurve(float x1, float y1, float cx1, float cy1,
-								float cx2, float cy2, float x2, float y2)
-{
-	const float epsilon = 1.0f;
-
-	float dx = x2 - x1;
-	float dy = y2 - y1;
-	float len = sqrt(dx * dx + dy * dy);
-
-	if (len < epsilon)
-		return true;
-
-	dx /= len;
-	dy /= len;
-
-	float d1x = cx1 - x1;
-	float d1y = cy1 - y1;
-	float cross1 = fabs(d1x * dy - d1y * dx);
-
-	float d2x = cx2 - x1;
-	float d2y = cy2 - y1;
-	float cross2 = fabs(d2x * dy - d2y * dx);
-
-	return (cross1 < epsilon && cross2 < epsilon);
-}
 
 SVGRenderer::SVGRenderer() : fIdCounter(0)
 {
@@ -171,11 +130,11 @@ SVGRenderer::_GradientToSVG(const Gradient& grad, const std::string& id)
 		std::string stopColor = _ColorToCSS(stop.color);
 		float alpha = _GetColorAlpha(stop.color);
 
-		svg << "<stop offset=\"" << FormatFixed(offset, 2)
+		svg << "<stop offset=\"" << utils::FormatFixed(offset, 2)
 		    << "%\" stop-color=\"" << stopColor << "\"";
 
 		if (alpha < 1.0f) {
-			svg << " stop-opacity=\"" << FormatFixed(alpha, 2) << "\"";
+			svg << " stop-opacity=\"" << utils::FormatFixed(alpha, 2) << "\"";
 		}
 
 		svg << " />\n";
@@ -207,7 +166,7 @@ SVGRenderer::_ShapeToSVG(const Shape& shape, const HVIFIcon& icon,
 	if (shape.styleIndex < icon.styles.size()) {
 		const Style& style = icon.styles[shape.styleIndex];
 		if (style.isGradient) {
-			std::string gradientId = id + "-g" + ToString(static_cast<int>(shape.styleIndex));
+			std::string gradientId = id + "-g" + utils::ToString(static_cast<int>(shape.styleIndex));
 			fillColor = "url(#" + gradientId + ")";
 			additionalDefs = _GradientToSVG(style.gradient, gradientId);
 			opacity = 1.0f;
@@ -251,9 +210,9 @@ SVGRenderer::_ShapeToSVG(const Shape& shape, const HVIFIcon& icon,
 
 	std::string style;
 	if (effectType == "stroke") {
-		style = "fill:none;stroke:" + fillColor + ";stroke-width:" + ToString(strokeEffect.width);
-		style += ";stroke-linejoin:" + _GetLineJoinName(strokeEffect.lineJoin);
-		style += ";stroke-linecap:" + _GetLineCapName(strokeEffect.lineCap);
+		style = "fill:none;stroke:" + fillColor + ";stroke-width:" + utils::ToString(strokeEffect.width);
+		style += ";stroke-linejoin:" + utils::GetLineJoinName(strokeEffect.lineJoin);
+		style += ";stroke-linecap:" + utils::GetLineCapName(strokeEffect.lineCap);
 	} else {
 		style = "fill:" + fillColor + ";stroke:none";
 	}
@@ -320,8 +279,8 @@ SVGRenderer::_PathToSVG(const std::vector<Path>& paths)
 					float prevX = (i == 6) ? x0 : path.points[i-6];
 					float prevY = (i == 6) ? y0 : path.points[i-5];
 
-					if (fabs(xout - prevX) < 1e-3f && fabs(yout - prevY) < 1e-3f &&
-						fabs(xin - x) < 1e-3f && fabs(yin - y) < 1e-3f) {
+					if (utils::FloatEqual(xout, prevX) && utils::FloatEqual(yout, prevY) &&
+						utils::FloatEqual(xin, x) && utils::FloatEqual(yin, y)) {
 						pathData << " L " << x << " " << y;
 					} else {
 						pathData << " C " << xout << " " << yout << " "
@@ -341,11 +300,11 @@ SVGRenderer::_PathToSVG(const std::vector<Path>& paths)
 				float lastX = path.points[lastSegmentStart];
 				float lastY = path.points[lastSegmentStart + 1];
 
-				bool alreadyAtStart = (fabs(lastX - x0) < 1e-3f && fabs(lastY - y0) < 1e-3f);
+				bool alreadyAtStart = (utils::FloatEqual(lastX, x0) && utils::FloatEqual(lastY, y0));
 
 				if (!alreadyAtStart) {
-					if (fabs(xout - lastX) < 1e-3f && fabs(yout - lastY) < 1e-3f &&
-						fabs(xin0 - x0) < 1e-3f && fabs(yin0 - y0) < 1e-3f) {
+					if (utils::FloatEqual(xout, lastX) && utils::FloatEqual(yout, lastY) &&
+						utils::FloatEqual(xin0, x0) && utils::FloatEqual(yin0, y0)) {
 						pathData << " L " << x0 << " " << y0;
 					} else {
 						pathData << " C " << xout << " " << yout << " "
@@ -369,8 +328,8 @@ SVGRenderer::_TransformToSVG(const std::vector<float>& transform,
 		return _MatrixToSVG(transform);
 	} else if (type == "translate") {
 		if (transform.size() >= 2) {
-			return "translate(" + ToString(transform[0]) + " " + 
-				   ToString(transform[1]) + ")";
+			return "translate(" + utils::ToString(transform[0]) + " " +
+				   utils::ToString(transform[1]) + ")";
 		}
 	}
 	return "";
@@ -381,41 +340,18 @@ SVGRenderer::_MatrixToSVG(const std::vector<float>& matrix)
 {
 	if (matrix.size() >= 6) {
 		std::ostringstream result;
-		result << "matrix(" << FormatFixed(matrix[0], 6) << " " << FormatFixed(matrix[1], 6) << " "
-			   << FormatFixed(matrix[2], 6) << " " << FormatFixed(matrix[3], 6) << " "
-			   << FormatFixed(matrix[4] * 102, 2) << " " << FormatFixed(matrix[5] * 102, 2) << ")";
+		result << "matrix(" << utils::FormatFixed(matrix[0], 6) << " " << utils::FormatFixed(matrix[1], 6) << " "
+			   << utils::FormatFixed(matrix[2], 6) << " " << utils::FormatFixed(matrix[3], 6) << " "
+			   << utils::FormatFixed(matrix[4] * 102, 2) << " " << utils::FormatFixed(matrix[5] * 102, 2) << ")";
 		return result.str();
 	}
 	return "";
 }
 
 std::string
-SVGRenderer::_GetLineJoinName(uint8_t lineJoin)
-{
-	switch (lineJoin) {
-		case MITER: return "miter";
-		case ROUND: return "round";
-		case BEVEL: return "bevel";
-		case MITER_ROUND: return "miter";
-		default: return "miter";
-	}
-}
-
-std::string
-SVGRenderer::_GetLineCapName(uint8_t lineCap)
-{
-	switch (lineCap) {
-		case BUTT: return "butt";
-		case SQUARE: return "square";
-		case ROUND_CAP: return "round";
-		default: return "butt";
-	}
-}
-
-std::string
 SVGRenderer::_GenerateID()
 {
-	return "hvif" + ToString(++fIdCounter);
+	return "hvif" + utils::ToString(++fIdCounter);
 }
 
 }

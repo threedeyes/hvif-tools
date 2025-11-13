@@ -12,37 +12,9 @@
 #include "nanosvg.h"
 
 #include "SVGParser.h"
+#include "Utils.h"
 
 namespace hvif {
-
-template<typename T>
-static T clamp_value(const T& value, const T& min_val, const T& max_val) {
-	return (value < min_val) ? min_val : (value > max_val) ? max_val : value;
-}
-
-static long round_to_long(double x) {
-	return static_cast<long>(x + (x >= 0 ? 0.5 : -0.5));
-}
-
-static inline uint8_t MapCap(int nsvgCap)
-{
-	switch (nsvgCap) {
-		case 0: return hvif::BUTT;
-		case 1: return hvif::ROUND_CAP;
-		case 2: return hvif::SQUARE;
-		default: return hvif::BUTT;
-	}
-}
-
-static inline uint8_t MapJoin(int nsvgJoin)
-{
-	switch (nsvgJoin) {
-		case 0: return hvif::MITER;
-		case 1: return hvif::ROUND;
-		case 2: return hvif::BEVEL;
-		default: return hvif::MITER;
-	}
-}
 
 bool
 SVGParser::ParseFile(const std::string& svgFile, hvif::HVIFWriter& writer)
@@ -142,10 +114,10 @@ SVGParser::_ProcessShape(NSVGshape* shape, ParseState& state)
 		hvif::Transformer t;
 		t.tag = hvif::STROKE;
 		t.width = shape->strokeWidth * state.scale;
-		t.lineCap  = MapCap(shape->strokeLineCap);
-		t.lineJoin = MapJoin(shape->strokeLineJoin);
+		t.lineCap  = utils::MapCapFromNanoSVG(shape->strokeLineCap);
+		t.lineJoin = utils::MapJoinFromNanoSVG(shape->strokeLineJoin);
 		t.miterLimit = static_cast<uint8_t>(
-			clamp_value<int>(static_cast<int>(round_to_long(shape->miterLimit)), 0, 255)
+			utils::clamp<int>(static_cast<int>(utils::RoundToLong(shape->miterLimit)), 0, 255)
 		);
 		hvifShape.transformers.push_back(t);
 		state.writer->AddShape(hvifShape);
@@ -207,7 +179,7 @@ SVGParser::_ProcessPath(NSVGpath* path, ParseState& state)
 		if (hvifPath.nodes.size() > 1) {
 			const hvif::PathNode& firstNode = hvifPath.nodes[0];
 			hvif::PathNode& lastNode = hvifPath.nodes.back();
-			if (fabs(firstNode.x - lastNode.x) < 1e-3f && fabs(firstNode.y - lastNode.y) < 1e-3f) {
+			if (utils::FloatEqual(firstNode.x, lastNode.x) && utils::FloatEqual(firstNode.y, lastNode.y)) {
 				hvifPath.nodes[0].x_in = lastNode.x_in;
 				hvifPath.nodes[0].y_in = lastNode.y_in;
 				hvifPath.nodes.pop_back();
@@ -272,31 +244,13 @@ SVGParser::_AddStyle(const NSVGpaint& paint, float opacity, ParseState& state)
 }
 
 void
-SVGParser::_InvertAffine(float out[6], const float in[6])
-{
-	float a = in[0], b = in[1], c = in[2], d = in[3], e = in[4], f = in[5];
-	float det = a * d - b * c;
-	if (fabs(det) < 1e-12f) {
-		out[0] = 1; out[1] = 0; out[2] = 0; out[3] = 1; out[4] = 0; out[5] = 0;
-		return;
-	}
-	float invDet = 1.0f / det;
-	out[0] =  d * invDet;
-	out[1] = -b * invDet;
-	out[2] = -c * invDet;
-	out[3] =  a * invDet;
-	out[4] = (c * f - d * e) * invDet;
-	out[5] = (b * e - a * f) * invDet;
-}
-
-void
 SVGParser::_CalculateGradientTransform(const NSVGpaint& paint, hvif::Gradient& grad, const ParseState& state)
 {
 	NSVGgradient* g = paint.gradient;
 	if (!g) return;
 
 	float M[6];
-	_InvertAffine(M, g->xform);
+	utils::InvertAffine(M, g->xform);
 
 	if (paint.type == NSVG_PAINT_LINEAR_GRADIENT) {
 		float x1 = M[4];

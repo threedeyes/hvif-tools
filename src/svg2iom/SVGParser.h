@@ -41,7 +41,6 @@ private:
 	int			_AddStyle(const NSVGpaint& paint, float opacity, ConvertState& state);
 	uint32_t	_NSVGColorToIOM(unsigned int color, float opacity);
 	void		_CalculateGradientTransform(const NSVGpaint& paint, Gradient& grad, const ConvertState& state);
-	void		_InvertAffine(float out[6], const float in[6]);
 };
 
 }

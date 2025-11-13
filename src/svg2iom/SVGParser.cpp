@@ -10,28 +10,9 @@
 #include "nanosvg.h"
 
 #include "SVGParser.h"
+#include "Utils.h"
 
 namespace iom {
-
-static inline int32_t MapCapToIOM(int nsvgCap)
-{
-	switch (nsvgCap) {
-		case 0: return 0;
-		case 1: return 2;
-		case 2: return 1;
-		default: return 0;
-	}
-}
-
-static inline int32_t MapJoinToIOM(int nsvgJoin)
-{
-	switch (nsvgJoin) {
-		case 0: return 0;
-		case 1: return 2;
-		case 2: return 3;
-		default: return 0;
-	}
-}
 
 SVGParser::SVGParser()
 {
@@ -126,8 +107,8 @@ SVGParser::_ProcessShape(NSVGshape* shape, ConvertState& state)
 		strokeStyleIndex = _AddStyle(shape->stroke, shape->opacity, state);
 		strokeTransformer.type = TRANSFORMER_STROKE;
 		strokeTransformer.width = shape->strokeWidth * state.scale;
-		strokeTransformer.lineCap = MapCapToIOM(shape->strokeLineCap);
-		strokeTransformer.lineJoin = MapJoinToIOM(shape->strokeLineJoin);
+		strokeTransformer.lineCap = utils::MapCapFromNanoSVG(shape->strokeLineCap);
+		strokeTransformer.lineJoin = utils::MapJoinFromNanoSVG(shape->strokeLineJoin);
 		strokeTransformer.miterLimit = shape->miterLimit;
 		hasStroke = true;
 	}
@@ -227,7 +208,7 @@ SVGParser::_ProcessPath(NSVGpath* path, ConvertState& state)
 
 		const ControlPoint& first = iomPath.points[0];
 		ControlPoint& last = iomPath.points[iomPath.points.size() - 1];
-		if (std::fabs(first.x - last.x) < 0.01f && std::fabs(first.y - last.y) < 0.01f) {
+		if (utils::FloatEqual(first.x, last.x, 0.01f) && utils::FloatEqual(first.y, last.y, 0.01f)) {
 			iomPath.points[0].x_in = last.x_in;
 			iomPath.points[0].y_in = last.y_in;
 			iomPath.points.pop_back();
@@ -299,32 +280,6 @@ SVGParser::_NSVGColorToIOM(unsigned int color, float opacity)
 }
 
 void
-SVGParser::_InvertAffine(float out[6], const float in[6])
-{
-	float a = in[0];
-	float b = in[1];
-	float c = in[2];
-	float d = in[3];
-	float e = in[4];
-	float f = in[5];
-	
-	float det = a * d - b * c;
-	if (det < 1e-12f && det > -1e-12f) {
-		out[0] = 1; out[1] = 0; out[2] = 0; 
-		out[3] = 1; out[4] = 0; out[5] = 0;
-		return;
-	}
-	
-	float invDet = 1.0f / det;
-	out[0] =  d * invDet;
-	out[1] = -b * invDet;
-	out[2] = -c * invDet;
-	out[3] =  a * invDet;
-	out[4] = (c * f - d * e) * invDet;
-	out[5] = (b * e - a * f) * invDet;
-}
-
-void
 SVGParser::_CalculateGradientTransform(const NSVGpaint& paint, Gradient& grad, const ConvertState& state)
 {
 	NSVGgradient* g = paint.gradient;
@@ -332,7 +287,7 @@ SVGParser::_CalculateGradientTransform(const NSVGpaint& paint, Gradient& grad, c
 		return;
 
 	float M[6];
-	_InvertAffine(M, g->xform);
+	utils::InvertAffine(M, g->xform);
 
 	double a = 1.0, b = 0.0, c = 0.0, d = 1.0, tx = 0.0, ty = 0.0;
 

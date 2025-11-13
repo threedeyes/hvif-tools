@@ -8,15 +8,9 @@
 #include <sstream>
 
 #include "HVIFParser.h"
+#include "Utils.h"
 
 namespace hvif {
-
-template<typename T>
-std::string ToString(T value) {
-	std::ostringstream oss;
-	oss << value;
-	return oss.str();
-}
 
 struct GradientStopComparator {
 	bool operator()(const GradientStop& a, const GradientStop& b) const {
@@ -209,7 +203,7 @@ HVIFParser::_ReadShape(Shape& shape)
 		return false;
 	
 	if (tag != 0x0A) {
-		_SetError("Unknown shape tag: " + ToString(static_cast<int>(tag)));
+		_SetError("Unknown shape tag: " + utils::ToString(static_cast<int>(tag)));
 		return false;
 	}
 	
@@ -283,7 +277,7 @@ HVIFParser::_ReadColor(Color& color, ColorTags tag)
 		case K:
 			return _ReadBytes(color.data, 1);
 		default:
-			_SetError("Unknown color format: " + ToString(static_cast<int>(tag)));
+			_SetError("Unknown color format: " + utils::ToString(static_cast<int>(tag)));
 			return false;
 	}
 }
@@ -377,7 +371,7 @@ HVIFParser::_ReadTransformers(std::vector<Transformer>& transformers, uint8_t co
 			}
 
 			default:
-				_SetError("Unknown transformer tag: " + ToString(static_cast<int>(transformer.tag)));
+				_SetError("Unknown transformer tag: " + utils::ToString(static_cast<int>(transformer.tag)));
 				return false;
 		}
 

@@ -47,7 +47,6 @@ private:
 	void _ProcessShape(NSVGshape* shape, ParseState& state);
 	uint8_t _ProcessPath(NSVGpath* path, ParseState& state);
 	uint8_t _AddStyle(const NSVGpaint& paint, float opacity, ParseState& state);
-	void _InvertAffine(float out[6], const float in[6]);	
 	void _CalculateGradientTransform(const NSVGpaint& paint, hvif::Gradient& grad, const ParseState& state);
 };
 

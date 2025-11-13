@@ -8,24 +8,9 @@
 #include <cmath>
 
 #include "SVGRenderer.h"
+#include "Utils.h"
 
 namespace iom {
-
-template<typename T>
-std::string ToString(T value) {
-	std::ostringstream oss;
-	oss << value;
-	return oss.str();
-}
-
-static inline std::string FormatFixed(double value, int precision)
-{
-	std::ostringstream oss;
-	oss.setf(std::ios::fixed, std::ios::floatfield);
-	oss.precision(precision);
-	oss << value;
-	return oss.str();
-}
 
 SVGRenderer::SVGRenderer(bool addNames) : fIdCounter(0), fAddNames(addNames)
 {
@@ -108,11 +93,11 @@ SVGRenderer::_GradientToSVG(const Gradient& grad, const std::string& id, const s
 		std::string stopColor = _ColorToCSS(stop.color);
 		float alpha = _GetColorAlpha(stop.color);
 
-		svg << "<stop offset=\"" << FormatFixed(stop.offset * 100.0, 2)
+		svg << "<stop offset=\"" << utils::FormatFixed(stop.offset * 100.0, 2)
 			<< "%\" stop-color=\"" << stopColor << "\"";
 
 		if (alpha < 1.0f) {
-			svg << " stop-opacity=\"" << FormatFixed(alpha, 2) << "\"";
+			svg << " stop-opacity=\"" << utils::FormatFixed(alpha, 2) << "\"";
 		}
 
 		svg << " />\n";
@@ -185,8 +170,6 @@ SVGRenderer::_ShapeToSVG(const Shape& shape, const Icon& icon, int shapeIndex)
 			strokeTrans = trans;
 			break;
 		} else if (trans.type == TRANSFORMER_CONTOUR) {
-			// TODO: SVG has no direct equivalent for CONTOUR transformer
-			// (path offset/expand). Shape is rendered as-is without this effect.
 			continue;
 		}
 	}
@@ -206,12 +189,12 @@ SVGRenderer::_ShapeToSVG(const Shape& shape, const Icon& icon, int shapeIndex)
 				 shape.name[shape.name.size()-1] == '>');
 
 			if (isDefaultName) {
-				elementId = "shape_" + ToString(shapeIndex);
+				elementId = "shape_" + utils::ToString(shapeIndex);
 			} else {
 				elementId = shape.name;
 			}
 		} else {
-			elementId = "shape_" + ToString(shapeIndex);
+			elementId = "shape_" + utils::ToString(shapeIndex);
 		}
 
 		svg << " id=\"" << elementId << "\"";
@@ -231,9 +214,9 @@ SVGRenderer::_ShapeToSVG(const Shape& shape, const Icon& icon, int shapeIndex)
 
 		std::string style;
 		if (isStroke) {
-			style = "fill:none;stroke:" + fillColor + ";stroke-width:" + ToString(strokeTrans.width);
-			style += ";stroke-linejoin:" + _GetLineJoinName(strokeTrans.lineJoin);
-			style += ";stroke-linecap:" + _GetLineCapName(strokeTrans.lineCap);
+			style = "fill:none;stroke:" + fillColor + ";stroke-width:" + utils::ToString(strokeTrans.width);
+			style += ";stroke-linejoin:" + utils::GetLineJoinName(strokeTrans.lineJoin);
+			style += ";stroke-linecap:" + utils::GetLineCapName(strokeTrans.lineCap);
 		} else {
 			style = "fill:" + fillColor + ";stroke:none";
 		}
@@ -263,42 +246,18 @@ SVGRenderer::_TransformToSVG(const std::vector<double>& matrix)
 {
 	if (matrix.size() >= 6) {
 		std::ostringstream result;
-		result << "matrix(" << FormatFixed(matrix[0], 6) << " " << FormatFixed(matrix[1], 6) << " "
-			   << FormatFixed(matrix[2], 6) << " " << FormatFixed(matrix[3], 6) << " "
-			   << FormatFixed(matrix[4], 2) << " " << FormatFixed(matrix[5], 2) << ")";
+		result << "matrix(" << utils::FormatFixed(matrix[0], 6) << " " << utils::FormatFixed(matrix[1], 6) << " "
+			   << utils::FormatFixed(matrix[2], 6) << " " << utils::FormatFixed(matrix[3], 6) << " "
+			   << utils::FormatFixed(matrix[4], 2) << " " << utils::FormatFixed(matrix[5], 2) << ")";
 		return result.str();
 	}
 	return "";
 }
 
 std::string
-SVGRenderer::_GetLineJoinName(int32_t lineJoin)
-{
-	switch (lineJoin) {
-		case 0: return "miter";
-		case 1: return "miter";
-		case 2: return "round";
-		case 3: return "bevel";
-		case 4: return "miter";
-		default: return "miter";
-	}
-}
-
-std::string
-SVGRenderer::_GetLineCapName(int32_t lineCap)
-{
-	switch (lineCap) {
-		case 0: return "butt";
-		case 1: return "square";
-		case 2: return "round";
-		default: return "butt";
-	}
-}
-
-std::string
 SVGRenderer::_GenerateID()
 {
-	return "iom" + ToString(++fIdCounter);
+	return "iom" + utils::ToString(++fIdCounter);
 }
 
 }
