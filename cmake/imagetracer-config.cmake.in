@@ -1,0 +1,62 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Find required dependencies
+find_dependency(Threads REQUIRED)
+
+# Get installation paths
+set_and_check(IMAGETRACER_INCLUDE_DIR "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@/imagetracer")
+set_and_check(IMAGETRACER_LIB_DIR "@PACKAGE_CMAKE_INSTALL_LIBDIR@")
+
+# Determine library type
+set(IMAGETRACER_LIBRARY_TYPE STATIC)
+if(@BUILD_SHARED_LIBS@)
+    set(IMAGETRACER_LIBRARY_TYPE SHARED)
+endif()
+
+# Import imagetracer library
+if(NOT TARGET hvif::tracer)
+    add_library(hvif::tracer ${IMAGETRACER_LIBRARY_TYPE} IMPORTED)
+    
+    # Add ALL subdirectories to include path
+    set_target_properties(hvif::tracer PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES 
+            "${IMAGETRACER_INCLUDE_DIR};${IMAGETRACER_INCLUDE_DIR}/core;${IMAGETRACER_INCLUDE_DIR}/output;${IMAGETRACER_INCLUDE_DIR}/quantization;${IMAGETRACER_INCLUDE_DIR}/processing;${IMAGETRACER_INCLUDE_DIR}/utils"
+        INTERFACE_LINK_LIBRARIES "Threads::Threads"
+    )
+    
+    if(@BUILD_SHARED_LIBS@)
+        set_target_properties(hvif::tracer PROPERTIES
+            IMPORTED_LOCATION "${IMAGETRACER_LIB_DIR}/@CMAKE_SHARED_LIBRARY_PREFIX@imagetracer@CMAKE_SHARED_LIBRARY_SUFFIX@"
+            IMPORTED_SONAME "@CMAKE_SHARED_LIBRARY_PREFIX@imagetracer@CMAKE_SHARED_LIBRARY_SUFFIX@.@PROJECT_VERSION_MAJOR@"
+        )
+    else()
+        set_target_properties(hvif::tracer PROPERTIES
+            IMPORTED_LOCATION "${IMAGETRACER_LIB_DIR}/@CMAKE_STATIC_LIBRARY_PREFIX@imagetracer@CMAKE_STATIC_LIBRARY_SUFFIX@"
+        )
+    endif()
+    
+    # Legacy alias
+    add_library(imagetracer ALIAS hvif::tracer)
+endif()
+
+# Print dependency note
+if(NOT IMAGETRACER_FIND_QUIETLY)
+    message(STATUS "Note: imagetracer requires STB headers (stb_image.h, stb_image_write.h)")
+    message(STATUS "      Make sure to add STB to your include path")
+endif()
+
+# Export variables for backward compatibility
+set(IMAGETRACER_FOUND TRUE)
+set(IMAGETRACER_INCLUDE_DIRS 
+    ${IMAGETRACER_INCLUDE_DIR}
+    ${IMAGETRACER_INCLUDE_DIR}/core
+    ${IMAGETRACER_INCLUDE_DIR}/output
+    ${IMAGETRACER_INCLUDE_DIR}/quantization
+    ${IMAGETRACER_INCLUDE_DIR}/processing
+    ${IMAGETRACER_INCLUDE_DIR}/utils
+)
+set(IMAGETRACER_LIBRARIES hvif::tracer)
+
+check_required_components(imagetracer)

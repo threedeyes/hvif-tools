@@ -2,7 +2,7 @@
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
     <name>Icon-O-Matic Input</name>
     <id>org.inkscape.input.iom</id>
-    <dependency type="executable" location="path">iom2svg</dependency>
+    <dependency type="executable" location="path">icon2icon</dependency>
     <input>
         <extension>.iom</extension>
         <mimetype>application/x-vnd.Haiku-icon</mimetype>

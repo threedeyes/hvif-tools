@@ -1,0 +1,56 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+
+# Get installation paths
+set_and_check(HVIFTOOLS_INCLUDE_DIR "@PACKAGE_CMAKE_INSTALL_INCLUDEDIR@/hviftools")
+set_and_check(HVIFTOOLS_LIB_DIR "@PACKAGE_CMAKE_INSTALL_LIBDIR@")
+
+# Determine library type
+set(HVIFTOOLS_LIBRARY_TYPE STATIC)
+if(@BUILD_SHARED_LIBS@)
+    set(HVIFTOOLS_LIBRARY_TYPE SHARED)
+endif()
+
+# Import hviftools library
+if(NOT TARGET hvif::tools)
+    add_library(hvif::tools ${HVIFTOOLS_LIBRARY_TYPE} IMPORTED)
+    
+    # Add ALL subdirectories to include path
+    set_target_properties(hvif::tools PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES 
+            "${HVIFTOOLS_INCLUDE_DIR};${HVIFTOOLS_INCLUDE_DIR}/common;${HVIFTOOLS_INCLUDE_DIR}/import;${HVIFTOOLS_INCLUDE_DIR}/export"
+    )
+    
+    if(@BUILD_SHARED_LIBS@)
+        set_target_properties(hvif::tools PROPERTIES
+            IMPORTED_LOCATION "${HVIFTOOLS_LIB_DIR}/@CMAKE_SHARED_LIBRARY_PREFIX@hviftools@CMAKE_SHARED_LIBRARY_SUFFIX@"
+            IMPORTED_SONAME "@CMAKE_SHARED_LIBRARY_PREFIX@hviftools@CMAKE_SHARED_LIBRARY_SUFFIX@.@PROJECT_VERSION_MAJOR@"
+        )
+    else()
+        set_target_properties(hvif::tools PROPERTIES
+            IMPORTED_LOCATION "${HVIFTOOLS_LIB_DIR}/@CMAKE_STATIC_LIBRARY_PREFIX@hviftools@CMAKE_STATIC_LIBRARY_SUFFIX@"
+        )
+    endif()
+    
+    # Legacy alias
+    add_library(hviftools ALIAS hvif::tools)
+endif()
+
+# Print dependency note
+if(NOT HVIFTOOLS_FIND_QUIETLY)
+    message(STATUS "Note: hviftools requires NanoSVG headers (nanosvg.h, nanosvgrast.h)")
+    message(STATUS "      Make sure to add NanoSVG to your include path")
+endif()
+
+# Export variables for backward compatibility
+set(HVIFTOOLS_FOUND TRUE)
+set(HVIFTOOLS_INCLUDE_DIRS 
+    ${HVIFTOOLS_INCLUDE_DIR}
+    ${HVIFTOOLS_INCLUDE_DIR}/common
+    ${HVIFTOOLS_INCLUDE_DIR}/import
+    ${HVIFTOOLS_INCLUDE_DIR}/export
+)
+set(HVIFTOOLS_LIBRARIES hvif::tools)
+
+check_required_components(hviftools)

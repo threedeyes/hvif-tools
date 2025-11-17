@@ -12,52 +12,163 @@ message(STATUS "Version:        ${PROJECT_VERSION}")
 message(STATUS "Build type:     ${CMAKE_BUILD_TYPE}")
 message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
 message(STATUS "")
-message(STATUS "Tools to build:")
-message(STATUS "  hvif2svg:     ${BUILD_HVIF2SVG}")
-message(STATUS "  svg2hvif:     ${BUILD_SVG2HVIF}")
-message(STATUS "  iom2svg:      ${BUILD_IOM2SVG}")
-message(STATUS "  svg2iom:      ${BUILD_SVG2IOM}")
-message(STATUS "  img2svg:      ${BUILD_IMG2SVG}")
-message(STATUS "  msg2txt:      ${BUILD_MSG2TXT}")
-if(HAIKU)
-    message(STATUS "  iom2hvif:     ${BUILD_IOM2HVIF}")
+
+# ============================================================================
+# Libraries
+# ============================================================================
+
+message(STATUS "Libraries:")
+
+if(TARGET hviftools)
+    set(_hviftools_type "static")
+    if(BUILD_SHARED_LIBS)
+        set(_hviftools_type "shared")
+    endif()
+    message(STATUS "  libhviftools:     ${_hviftools_type}")
+else()
+    message(STATUS "  libhviftools:     OFF")
 endif()
-if(WIN32)
-    message(STATUS "  hvif4win:     ${BUILD_HVIF4WIN}")
+
+if(TARGET imagetracer)
+    set(_tracer_type "static")
+    if(BUILD_SHARED_LIBS)
+        set(_tracer_type "shared")
+    endif()
+    message(STATUS "  libimagetracer:   ${_tracer_type}")
+else()
+    message(STATUS "  libimagetracer:   OFF")
 endif()
-message(STATUS "")
-message(STATUS "Integration:")
-message(STATUS "  Inkscape ext: ${BUILD_INKSCAPE_EXTENSIONS}")
-message(STATUS "")
-message(STATUS "Development options:")
-message(STATUS "  Warnings:     ${HVIF_TOOLS_WARNINGS}")
-message(STATUS "  Werror:       ${HVIF_TOOLS_WERROR}")
-message(STATUS "  Tests:        ${HVIF_TOOLS_TESTS}")
-message(STATUS "  Sanitizers:   ${HVIF_TOOLS_SANITIZERS}")
+
 message(STATUS "")
 
+# ============================================================================
+# CLI Tools
+# ============================================================================
+
+message(STATUS "Tools to build:")
+
+if(TARGET icon2icon)
+    message(STATUS "  icon2icon:        ON")
+else()
+    message(STATUS "  icon2icon:        OFF")
+endif()
+
+if(TARGET img2svg)
+    message(STATUS "  img2svg:          ON")
+else()
+    message(STATUS "  img2svg:          OFF")
+endif()
+
+if(TARGET msgdump)
+    message(STATUS "  msgdump:          ON")
+else()
+    message(STATUS "  msgdump:          OFF")
+endif()
+
+message(STATUS "")
+
+# ============================================================================
+# Platform Integration
+# ============================================================================
+
+message(STATUS "Integration:")
+
+if(TARGET HVIFThumbnailProvider)
+    message(STATUS "  Windows addon:    ON")
+elseif(WIN32)
+    message(STATUS "  Windows addon:    OFF")
+endif()
+
+if(BUILD_INKSCAPE_EXTENSIONS)
+    message(STATUS "  Inkscape ext:     ON")
+else()
+    message(STATUS "  Inkscape ext:     OFF")
+endif()
+
+message(STATUS "")
+
+# ============================================================================
+# Testing & Development
+# ============================================================================
+
+if(BUILD_STRESS_TEST OR HVIF_TOOLS_TESTS OR HVIF_TOOLS_SANITIZERS OR HVIF_TOOLS_WARNINGS)
+    message(STATUS "Development options:")
+    
+    if(TARGET hvif-stress-test)
+        message(STATUS "  Stress test:      ON")
+    elseif(BUILD_STRESS_TEST)
+        message(STATUS "  Stress test:      FAILED")
+    endif()
+    
+    if(HVIF_TOOLS_TESTS)
+        message(STATUS "  Tests:            ${HVIF_TOOLS_TESTS}")
+    endif()
+    
+    if(HVIF_TOOLS_WARNINGS)
+        message(STATUS "  Warnings:         ${HVIF_TOOLS_WARNINGS}")
+    endif()
+    
+    if(HVIF_TOOLS_WERROR)
+        message(STATUS "  Werror:           ${HVIF_TOOLS_WERROR}")
+    endif()
+    
+    if(HVIF_TOOLS_SANITIZERS)
+        message(STATUS "  Sanitizers:       ${HVIF_TOOLS_SANITIZERS}")
+    endif()
+    
+    message(STATUS "")
+endif()
+
+# ============================================================================
+# Dependencies
+# ============================================================================
+
+message(STATUS "Dependencies:")
+
+if(NANOSVG_FOUND)
+    message(STATUS "  NanoSVG:          found")
+else()
+    message(STATUS "  NanoSVG:          NOT FOUND")
+endif()
+
+if(STB_FOUND)
+    message(STATUS "  STB:              found")
+else()
+    message(STATUS "  STB:              NOT FOUND")
+endif()
+
+message(STATUS "")
+
+# ============================================================================
+# Build targets summary
+# ============================================================================
+
 set(_targets_list "")
-if(TARGET hvif2svg)
-    list(APPEND _targets_list "hvif2svg")
+
+if(TARGET hviftools)
+    list(APPEND _targets_list "hviftools")
 endif()
-if(TARGET svg2hvif)
-    list(APPEND _targets_list "svg2hvif")
+
+if(TARGET imagetracer)
+    list(APPEND _targets_list "imagetracer")
 endif()
-if(TARGET iom2svg)
-    list(APPEND _targets_list "iom2svg")
+
+if(TARGET icon2icon)
+    list(APPEND _targets_list "icon2icon")
 endif()
-if(TARGET svg2iom)
-    list(APPEND _targets_list "svg2iom")
-endif()
+
 if(TARGET img2svg)
     list(APPEND _targets_list "img2svg")
 endif()
-if(TARGET msg2txt)
-    list(APPEND _targets_list "msg2txt")
+
+if(TARGET msgdump)
+    list(APPEND _targets_list "msgdump")
 endif()
-if(TARGET iom2hvif)
-    list(APPEND _targets_list "iom2hvif")
+
+if(TARGET hvif-stress-test)
+    list(APPEND _targets_list "hvif-stress-test")
 endif()
+
 if(TARGET HVIFThumbnailProvider)
     list(APPEND _targets_list "HVIFThumbnailProvider")
 endif()
@@ -79,6 +190,7 @@ if(_targets_count GREATER 0)
     if(HVIF_TOOLS_INSTALL)
         message(STATUS "Installation:")
         message(STATUS "  cmake --install .")
+        message(STATUS "  cmake --install . --component <name>")
         message(STATUS "")
     endif()
     

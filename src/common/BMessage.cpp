@@ -9,8 +9,7 @@
 
 #include "BMessage.h"
 
-// #pragma mark - Byte swapping
-
+namespace haiku_compat {
 
 uint32_t
 BMessage::_SwapUInt32(uint32_t value)
@@ -77,9 +76,6 @@ BMessage::_SwapFieldHeader(field_header* field)
 }
 
 
-// #pragma mark - Construction/Destruction
-
-
 BMessage::BMessage()
 	:
 	what(0),
@@ -91,9 +87,9 @@ BMessage::BMessage()
 }
 
 
-BMessage::BMessage(uint32_t what)
+BMessage::BMessage(uint32_t whatValue)
 	:
-	what(what),
+	what(whatValue),
 	fHeader(NULL),
 	fFields(NULL),
 	fData(NULL),
@@ -165,9 +161,6 @@ BMessage::operator=(const BMessage& other)
 	what = other.what;
 	return *this;
 }
-
-
-// #pragma mark - Unflattening
 
 
 status_t
@@ -274,9 +267,6 @@ BMessage::Unflatten(const char* flatBuffer, ssize_t size)
 }
 
 
-// #pragma mark - Flattening
-
-
 ssize_t
 BMessage::FlattenedSize() const
 {
@@ -318,9 +308,6 @@ BMessage::Flatten(char* buffer, ssize_t size) const
 
 	return B_OK;
 }
-
-
-// #pragma mark - R5 Format Support
 
 
 status_t
@@ -531,9 +518,6 @@ BMessage::_AddR5Field(const char* name, type_code type, const void* data,
 
 	return B_OK;
 }
-
-
-// #pragma mark - Private methods
 
 
 status_t
@@ -840,9 +824,6 @@ BMessage::_RemoveField(field_header* field)
 }
 
 
-// #pragma mark - Field info
-
-
 status_t
 BMessage::GetInfo(type_code typeRequested, int32_t index, char** nameFound,
 	type_code* typeFound, int32_t* countFound) const
@@ -935,9 +916,6 @@ BMessage::MakeEmpty()
 	_Clear();
 	return _InitHeader();
 }
-
-
-// #pragma mark - Adding data
 
 
 status_t
@@ -1077,9 +1055,6 @@ BMessage::AddMessage(const char* name, const BMessage* message)
 }
 
 
-// #pragma mark - Removing data
-
-
 status_t
 BMessage::RemoveData(const char* name, int32_t index)
 {
@@ -1141,9 +1116,6 @@ BMessage::RemoveName(const char* name)
 
 	return _RemoveField(field);
 }
-
-
-// #pragma mark - Finding data
 
 
 status_t
@@ -1331,9 +1303,6 @@ BMessage::FindMessage(const char* name, int32_t index,
 }
 
 
-// #pragma mark - Checking for data
-
-
 #define DEFINE_HAS_FUNCTION(typeName, typeCode) \
 bool \
 BMessage::Has##typeName(const char* name, int32_t index) const \
@@ -1377,9 +1346,6 @@ BMessage::HasData(const char* name, type_code type, int32_t index) const
 
 	return true;
 }
-
-
-// #pragma mark - Convenience getters
 
 
 bool
@@ -1449,9 +1415,6 @@ BMessage::GetString(const char* name, int32_t index,
 		return value;
 	return defaultValue;
 }
-
-
-// #pragma mark - Setting data
 
 
 #define DEFINE_SET_FUNCTION(type, typeName, typeCode) \
@@ -1543,9 +1506,6 @@ BMessage::SetData(const char* name, type_code type, const void* data,
 	RemoveName(name);
 	return AddData(name, type, data, numBytes, fixedSize);
 }
-
-
-// #pragma mark - Debugging
 
 
 const char*
@@ -1764,4 +1724,6 @@ BMessage::_PrintToStream(const char* indent, bool showValues) const
 	}
 
 	printf("%s}\n", indent);
+}
+
 }

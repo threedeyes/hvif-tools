@@ -8,9 +8,9 @@ import inkex
 
 class HVIFInput(inkex.InputExtension):
     def load(self, stream):
-        if not shutil.which('hvif2svg'):
+        if not shutil.which('icon2icon'):
             raise inkex.AbortExtension(
-                "hvif2svg utility not found. Please install Haiku icon tools."
+                "icon2icon utility not found. Please install HVIF-Tools."
             )
 
         with tempfile.NamedTemporaryFile(mode='wb', suffix='.hvif', delete=False) as hvif_file:
@@ -24,7 +24,7 @@ class HVIFInput(inkex.InputExtension):
             
             try:
                 result = subprocess.run(
-                    ['hvif2svg', hvif_path, svg_path],
+                    ['icon2icon', hvif_path, svg_path],
                     capture_output=True,
                     text=True,
                     timeout=30
@@ -32,7 +32,7 @@ class HVIFInput(inkex.InputExtension):
             except subprocess.TimeoutExpired:
                 raise inkex.AbortExtension("HVIF conversion timeout exceeded (30s)")
             except FileNotFoundError:
-                raise inkex.AbortExtension("hvif2svg not found in PATH")
+                raise inkex.AbortExtension("icon2icon not found in PATH")
             
             if result.returncode != 0:
                 raise inkex.AbortExtension(f"Failed to convert HVIF file: {result.stderr}")

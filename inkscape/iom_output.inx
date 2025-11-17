@@ -2,7 +2,7 @@
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
     <name>Icon-O-Matic Output</name>
     <id>org.inkscape.output.iom</id>
-    <dependency type="executable" location="path">svg2iom</dependency>
+    <dependency type="executable" location="path">icon2icon</dependency>
     <output>
         <extension>.iom</extension>
         <mimetype>application/x-vnd.Haiku-icon</mimetype>

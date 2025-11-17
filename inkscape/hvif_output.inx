@@ -2,7 +2,7 @@
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
     <name>HVIF Output</name>
     <id>org.inkscape.output.hvif</id>
-    <dependency type="executable" location="path">svg2hvif</dependency>
+    <dependency type="executable" location="path">icon2icon</dependency>
     <output>
         <extension>.hvif</extension>
         <mimetype>image/x-hvif</mimetype>

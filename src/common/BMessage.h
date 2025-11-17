@@ -18,10 +18,29 @@ typedef SSIZE_T ssize_t;
 #include <sys/types.h>
 #endif
 
-typedef int32_t status_t;
-typedef int64_t bigtime_t;
+#ifdef __HAIKU__
+#include <SupportDefs.h>
+#endif
 
-#ifndef __HAIKU__
+namespace haiku_compat {
+
+#ifdef __HAIKU__
+
+typedef ::status_t status_t;
+typedef ::bigtime_t bigtime_t;
+typedef ::type_code type_code;
+
+#undef B_OK
+#undef B_ERROR
+#undef B_NO_MEMORY
+#undef B_BAD_VALUE
+#undef B_NAME_NOT_FOUND
+#undef B_BAD_INDEX
+#undef B_BAD_TYPE
+#undef B_NO_INIT
+#undef B_BAD_DATA
+#undef B_BUFFER_OVERFLOW
+
 enum {
 	B_OK				= 0,
 	B_ERROR				= -1,
@@ -34,7 +53,28 @@ enum {
 	B_BAD_DATA			= -8,
 	B_BUFFER_OVERFLOW	= -9
 };
+
+#else
+
+typedef int32_t status_t;
+typedef int64_t bigtime_t;
+typedef uint32_t type_code;
+
+enum {
+	B_OK				= 0,
+	B_ERROR				= -1,
+	B_NO_MEMORY			= -2,
+	B_BAD_VALUE			= -3,
+	B_NAME_NOT_FOUND	= -4,
+	B_BAD_INDEX			= -5,
+	B_BAD_TYPE			= -6,
+	B_NO_INIT			= -7,
+	B_BAD_DATA			= -8,
+	B_BUFFER_OVERFLOW	= -9
+};
+
 #endif
+
 
 enum {
 	B_ANY_TYPE			= 'ANYT',
@@ -63,14 +103,13 @@ enum {
 	B_MESSENGER_TYPE	= 'MSNG'
 };
 
-typedef uint32_t type_code;
 
 struct BPoint {
 	float x;
 	float y;
 
 	BPoint() : x(0), y(0) {}
-	BPoint(float x, float y) : x(x), y(y) {}
+	BPoint(float xValue, float yValue) : x(xValue), y(yValue) {}
 };
 
 struct BRect {
@@ -125,15 +164,12 @@ public:
 
 			BMessage&			operator=(const BMessage& other);
 
-			// Unflattening
 			status_t			Unflatten(const char* flatBuffer,
 									ssize_t size = -1);
 
-			// Flattening
 			ssize_t				FlattenedSize() const;
 			status_t			Flatten(char* buffer, ssize_t size) const;
 
-			// Field info
 			status_t			GetInfo(type_code typeRequested, int32_t index,
 									char** nameFound, type_code* typeFound,
 									int32_t* countFound = NULL) const;
@@ -144,7 +180,6 @@ public:
 			bool				IsEmpty() const;
 			status_t			MakeEmpty();
 
-			// Adding data
 			status_t			AddData(const char* name, type_code type,
 									const void* data, ssize_t numBytes,
 									bool isFixedSize = true,
@@ -173,12 +208,10 @@ public:
 			status_t			AddMessage(const char* name,
 									const BMessage* message);
 
-			// Removing data
 			status_t			RemoveData(const char* name,
 									int32_t index = 0);
 			status_t			RemoveName(const char* name);
 
-			// Finding data
 			status_t			FindBool(const char* name, bool* value) const;
 			status_t			FindBool(const char* name, int32_t index,
 									bool* value) const;
@@ -275,7 +308,6 @@ public:
 									int32_t index, const void** data,
 									ssize_t* numBytes) const;
 
-			// Checking for data
 			bool				HasBool(const char* name,
 									int32_t index = 0) const;
 			bool				HasInt8(const char* name,
@@ -315,7 +347,6 @@ public:
 			bool				HasData(const char* name, type_code type,
 									int32_t index = 0) const;
 
-			// Convenience getters with defaults
 			bool				GetBool(const char* name,
 									bool defaultValue = false) const;
 			bool				GetBool(const char* name, int32_t index,
@@ -336,7 +367,6 @@ public:
 			const char*			GetString(const char* name, int32_t index,
 									const char* defaultValue) const;
 
-			// Setting data
 			status_t			SetBool(const char* name, bool value);
 			status_t			SetInt8(const char* name, int8_t value);
 			status_t			SetInt16(const char* name, int16_t value);
@@ -363,7 +393,6 @@ public:
 									const void* data, ssize_t numBytes,
 									bool fixedSize = true);
 
-			// Debugging
 			void				PrintToStream() const;
 			void				PrintToStream(bool showValues) const;
 			void				DumpBinaryStructure(const char* label = "") const;
@@ -383,7 +412,6 @@ private:
 				FIELD_FLAG_VALID				= 0x0001,
 				FIELD_FLAG_FIXED_SIZE			= 0x0002,
 				MESSAGE_BODY_HASH_TABLE_SIZE	= 5,
-				// R5 specific flags
 				R5_MESSAGE_FLAG_VALID			= 0x01,
 				R5_MESSAGE_FLAG_INCLUDE_TARGET	= 0x02,
 				R5_MESSAGE_FLAG_INCLUDE_REPLY	= 0x04,
@@ -468,14 +496,12 @@ private:
 									const char* prefix) const;
 			const char*			_TypeCodeToString(type_code type) const;
 
-			// R5 format support
 			status_t			_UnflattenR5Message(const uint8_t* buffer,
 									ssize_t size);
 			status_t			_AddR5Field(const char* name, type_code type,
 									const void* data, ssize_t dataSize,
 									bool fixedSize, int32_t count);
 
-			// Data manipulation
 			status_t			_ResizeData(uint32_t offset, int32_t change);
 			void				_UpdateOffsets(uint32_t offset,
 									int32_t change);
@@ -541,5 +567,7 @@ public:
 private:
 			BMessage*			fMessage;
 };
+
+}
 
 #endif

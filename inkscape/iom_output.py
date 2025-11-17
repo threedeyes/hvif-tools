@@ -8,9 +8,9 @@ import inkex
 
 class IOMOutput(inkex.OutputExtension):
     def save(self, stream):
-        if not shutil.which('svg2iom'):
+        if not shutil.which('icon2icon'):
             raise inkex.AbortExtension(
-                "svg2iom utility not found. Please install Icon-O-Matic tools."
+                "icon2icon utility not found. Please install HVIF-Tools."
             )
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.svg', delete=False) as svg_file:
@@ -24,7 +24,7 @@ class IOMOutput(inkex.OutputExtension):
             
             try:
                 result = subprocess.run(
-                    ['svg2iom', svg_path, iom_path],
+                    ['icon2icon', svg_path, iom_path],
                     capture_output=True,
                     text=True,
                     timeout=30
@@ -32,7 +32,7 @@ class IOMOutput(inkex.OutputExtension):
             except subprocess.TimeoutExpired:
                 raise inkex.AbortExtension("Icon-O-Matic conversion timeout exceeded (30s)")
             except FileNotFoundError:
-                raise inkex.AbortExtension("svg2iom not found in PATH")
+                raise inkex.AbortExtension("icon2icon not found in PATH")
             
             if result.returncode != 0:
                 raise inkex.AbortExtension(f"Failed to convert to Icon-O-Matic: {result.stderr}")

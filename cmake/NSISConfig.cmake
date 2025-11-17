@@ -2,8 +2,6 @@
 # Copyright 2025, Gerasim Troeglazov, 3dEyes@gmail.com. All rights reserved.
 # Distributed under the terms of the MIT License.
 #
-# NSIS installer configuration
-#
 
 if(NOT WIN32)
     return()
@@ -33,9 +31,7 @@ set(CPACK_NSIS_COMPONENT_INSTALL ON)
 
 set(CPACK_NSIS_MENU_LINKS "")
 
-# Installation commands
 set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "
-    ; Add to system PATH
     DetailPrint 'Adding to system PATH...'
     ReadRegStr \$R0 HKLM 'SYSTEM\\\\CurrentControlSet\\\\Control\\\\Session Manager\\\\Environment' 'Path'
     StrCpy \$R1 '\$INSTDIR\\\\bin'
@@ -63,7 +59,6 @@ set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "
     
     path_done:
     
-    ; Register HVIF file type
     DetailPrint 'Registering HVIF file type...'
     ReadRegStr \$R0 HKCR '.hvif' ''
     StrCmp \$R0 '' hvif_no_backup_needed
@@ -77,7 +72,6 @@ set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "
     WriteRegStr HKCR 'HVIFFile' 'FriendlyTypeName' 'HVIF Vector Image'
     WriteRegStr HKCR 'HVIFFile\\\\DefaultIcon' '' '\$INSTDIR\\\\installer\\\\hvif-file.ico,0'
     
-    ; Register IOM file type
     DetailPrint 'Registering IOM file type...'
     ReadRegStr \$R0 HKCR '.iom' ''
     StrCmp \$R0 '' iom_no_backup_needed
@@ -91,19 +85,38 @@ set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "
     WriteRegStr HKCR 'IOMFile' 'FriendlyTypeName' 'Icon-O-Matic Project'
     WriteRegStr HKCR 'IOMFile\\\\DefaultIcon' '' '\$INSTDIR\\\\installer\\\\iom-file.ico,0'
     
-    ; Install icon files
     DetailPrint 'Installing icon files...'
     CreateDirectory '\$INSTDIR\\\\installer'
     SetOutPath '\$INSTDIR\\\\installer'
 ")
 
-# Add file installation for icons
 if(EXISTS "${CMAKE_SOURCE_DIR}/installer")
     file(GLOB ICON_FILES "${CMAKE_SOURCE_DIR}/installer/*.ico")
     foreach(ICON_FILE ${ICON_FILES})
         get_filename_component(ICON_NAME ${ICON_FILE} NAME)
-        install(FILES ${ICON_FILE} DESTINATION installer COMPONENT a_tools)
+        install(FILES ${ICON_FILE} DESTINATION installer COMPONENT b_tools)
     endforeach()
+endif()
+
+if(BUILD_SHARED_LIBS)
+    set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
+    
+    DetailPrint 'Verifying runtime libraries...'
+    IfFileExists '\$INSTDIR\\\\bin\\\\hviftools.dll' 0 missing_hviftools
+    DetailPrint 'Found hviftools.dll'
+    Goto check_imagetracer
+    missing_hviftools:
+    MessageBox MB_OK|MB_ICONEXCLAMATION 'Warning: hviftools.dll not found. Tools may not work correctly.'
+    
+    check_imagetracer:
+    IfFileExists '\$INSTDIR\\\\bin\\\\imagetracer.dll' 0 missing_imagetracer
+    DetailPrint 'Found imagetracer.dll'
+    Goto runtime_check_done
+    missing_imagetracer:
+    MessageBox MB_OK|MB_ICONEXCLAMATION 'Warning: imagetracer.dll not found. img2svg may not work correctly.'
+    
+    runtime_check_done:
+    ")
 endif()
 
 set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
@@ -111,9 +124,7 @@ set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
     System::Call 'shell32.dll::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 ")
 
-# Uninstall commands
 set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "
-    ; Remove from PATH
     DetailPrint 'Removing from system PATH...'
     ReadRegStr \$R0 HKLM 'SYSTEM\\\\CurrentControlSet\\\\Control\\\\Session Manager\\\\Environment' 'Path'
     StrCpy \$R1 '\$INSTDIR\\\\bin'
@@ -154,7 +165,6 @@ set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "
     WriteRegExpandStr HKLM 'SYSTEM\\\\CurrentControlSet\\\\Control\\\\Session Manager\\\\Environment' 'Path' '\$R0'
     SendMessage 0xFFFF 0x001A 0 'STR:Environment' \$0 /TIMEOUT=5000
     
-    ; Restore HVIF file type
     DetailPrint 'Removing HVIF file type registration...'
     ReadRegStr \$R0 HKCR '.hvif' 'hvif_tools_backup'
     StrCmp \$R0 '' hvif_remove_key
@@ -168,7 +178,6 @@ set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "
     hvif_cleanup_progid:
     DeleteRegKey HKCR 'HVIFFile'
     
-    ; Restore IOM file type
     DetailPrint 'Removing IOM file type registration...'
     ReadRegStr \$R0 HKCR '.iom' 'hvif_tools_backup'
     StrCmp \$R0 '' iom_remove_key
@@ -182,7 +191,6 @@ set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "
     iom_cleanup_progid:
     DeleteRegKey HKCR 'IOMFile'
     
-    ; Remove icon files
     DetailPrint 'Removing icon files...'
     Delete '\$INSTDIR\\\\installer\\\\hvif-file.ico'
     Delete '\$INSTDIR\\\\installer\\\\iom-file.ico'
@@ -191,14 +199,12 @@ set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "
     System::Call 'shell32.dll::SHChangeNotify(i 0x08000000, i 0, i 0, i 0)'
 ")
 
-# Windows thumbnail provider registration
 if(TARGET HVIFThumbnailProvider)
     set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
     
-    ; Register thumbnail provider
     DetailPrint 'Registering thumbnail provider...'
-    IfFileExists '\$INSTDIR\\\\bin\\\\HVIFThumbnailProvider.dll' 0 skip_thumbnail_reg
-    ExecWait '\\\"regsvr32\\\" /s \\\"\$INSTDIR\\\\bin\\\\HVIFThumbnailProvider.dll\\\"' \$R0
+    IfFileExists '\$INSTDIR\\\\bin\\\\addons\\\\HVIFThumbnailProvider.dll' 0 skip_thumbnail_reg
+    ExecWait '\\\"regsvr32\\\" /s \\\"\$INSTDIR\\\\bin\\\\addons\\\\HVIFThumbnailProvider.dll\\\"' \$R0
     StrCmp \$R0 '0' thumbnail_reg_success
         DetailPrint 'Failed to register thumbnail provider'
         Goto skip_thumbnail_reg
@@ -209,10 +215,9 @@ if(TARGET HVIFThumbnailProvider)
     
     set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "${CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS}
     
-    ; Unregister thumbnail provider
     DetailPrint 'Unregistering thumbnail provider...'
-    IfFileExists '\$INSTDIR\\\\bin\\\\HVIFThumbnailProvider.dll' 0 skip_thumbnail_unreg
-    ExecWait '\\\"regsvr32\\\" /u /s \\\"\$INSTDIR\\\\bin\\\\HVIFThumbnailProvider.dll\\\"' \$R0
+    IfFileExists '\$INSTDIR\\\\bin\\\\addons\\\\HVIFThumbnailProvider.dll' 0 skip_thumbnail_unreg
+    ExecWait '\\\"regsvr32\\\" /u /s \\\"\$INSTDIR\\\\bin\\\\addons\\\\HVIFThumbnailProvider.dll\\\"' \$R0
     StrCmp \$R0 '0' thumbnail_unreg_success
         DetailPrint 'Warning: Failed to unregister thumbnail provider'
         Goto skip_thumbnail_unreg
@@ -222,21 +227,16 @@ if(TARGET HVIFThumbnailProvider)
     ")
 endif()
 
-# Inkscape extensions installation
 set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
     
-    ; Install Inkscape extensions (check if files exist)
     IfFileExists '\$INSTDIR\\\\share\\\\inkscape\\\\hvif_input.py' 0 skip_inkscape_install
     DetailPrint 'Installing Inkscape extensions...'
     
-    ; Try to find Inkscape from registry first
     ClearErrors
     ReadRegStr \$R1 HKLM 'SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\App Paths\\\\inkscape.exe' 'Path'
     IfErrors 0 inkscape_check_path
-        ; Try to get from executable path
         ReadRegStr \$R2 HKLM 'SOFTWARE\\\\Microsoft\\\\Windows\\\\CurrentVersion\\\\App Paths\\\\inkscape.exe' ''
         IfErrors try_standard_locations
-            ; Extract parent directory from full executable path
             StrCpy \$R1 \$R2
             StrLen \$R3 \$R1
             find_last_slash:
@@ -247,7 +247,6 @@ set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
                 Goto find_last_slash
             found_slash:
                 StrCpy \$R1 \$R1 \$R3
-                ; Remove bin if present
                 StrLen \$R3 \$R1
                 IntOp \$R3 \$R3 - 4
                 StrCpy \$R4 \$R1 4 \$R3
@@ -256,7 +255,6 @@ set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
                 Goto inkscape_check_path
     
     try_standard_locations:
-    ; Check standard installation locations
     IfFileExists '\$PROGRAMFILES64\\\\Inkscape\\\\bin\\\\inkscape.exe' 0 +3
         StrCpy \$R1 '\$PROGRAMFILES64\\\\Inkscape'
         Goto inkscape_path_found
@@ -269,7 +267,6 @@ set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
     Goto skip_inkscape_install
     
     inkscape_check_path:
-    ; Verify if this is a valid Inkscape installation
     IfFileExists '\$R1\\\\bin\\\\inkscape.exe' inkscape_path_found
         DetailPrint 'Invalid Inkscape path: \$R1'
         Goto try_standard_locations
@@ -277,7 +274,6 @@ set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
     inkscape_path_found:
     DetailPrint 'Found Inkscape installation at: \$R1'
     
-    ; Set extensions directory relative to Inkscape root
     StrCpy \$R3 '\$R1\\\\share\\\\inkscape\\\\extensions'
     DetailPrint 'Extensions directory: \$R3'
     IfFileExists '\$R3\\\\*.*' 0 inkscape_ext_dir_not_found
@@ -288,11 +284,9 @@ set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
     
     DetailPrint 'Extensions installed successfully to: \$R3'
     
-    ; Save paths for uninstaller
     WriteRegStr HKCU 'Software\\\\hvif-tools' 'InkscapeExtPath' '\$R3'
     WriteRegStr HKCU 'Software\\\\hvif-tools' 'InkscapePath' '\$R1'
     
-    ; Find inkscape.exe for file associations
     StrCpy \$R4 '\$R1\\\\bin\\\\inkscape.exe'
     IfFileExists '\$R4' inkscape_exe_found
         DetailPrint 'Warning: inkscape.exe not found'
@@ -300,7 +294,6 @@ set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
     inkscape_exe_found:
     DetailPrint 'Found Inkscape executable: \$R4'
     
-    ; Register file associations
     DetailPrint 'Registering Inkscape as default application for HVIF/IOM files...'
     WriteRegStr HKCR 'HVIFFile\\\\shell' '' 'open'
     WriteRegStr HKCR 'HVIFFile\\\\shell\\\\open' '' 'Open with Inkscape'
@@ -334,7 +327,6 @@ set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS "${CPACK_NSIS_EXTRA_INSTALL_COMMANDS}
 
 set(CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS "${CPACK_NSIS_EXTRA_UNINSTALL_COMMANDS}
     
-    ; Remove Inkscape extensions
     DetailPrint 'Removing Inkscape extensions...'
     ClearErrors
     ReadRegStr \$R1 HKCU 'Software\\\\hvif-tools' 'InkscapeExtPath'
