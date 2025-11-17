@@ -6,73 +6,60 @@ A comprehensive set of command-line tools and extensions for working with Haiku 
 
 ### Core Conversion Tools
 
-**hvif2svg** - Convert HVIF files to SVG format
-- Full HVIF format support with coordinate transformation
-- Solid colors and gradients (linear, radial, diamond, conic, XY, sqrt-XY)
-- Fill and stroke rendering via transformers
-- HVIF internal grid mapping (64×64 to 6528×6528)
+**`icon2icon`** - A universal icon format converter
+- Converts between HVIF, IOM, SVG and PNG.
+- Full HVIF format support with coordinate transformation.
+- Solid colors and gradients (linear, radial, diamond, conic, XY, sqrt-XY).
+- Fill and stroke rendering via transformers.
+- BMessage-based IOM format parsing.
+- SVG parsing via NanoSVG library.
+- Preserves named elements as SVG IDs with the `--names` flag.
 
-**svg2hvif** - Convert SVG files to HVIF format
-- SVG parsing via NanoSVG library
-- Automatic coordinate normalization and centering
-- Fill, stroke, gradient support with transform calculation
-- HVIF format limitation validation (max 255 styles/paths/shapes)
+**`iom2hvif`** - Convert Icon-O-Matic files to HVIF format (Haiku only).
+- Native Haiku implementation using Haiku API.
+- Direct IOM to HVIF conversion without intermediate formats.
+- Write icons to HVIF files or file/folder attributes.
+- Batch processing support for multiple files.
+- Based on Haiku Icon-O-Matic implementation.
 
-**iom2svg** - Convert Icon-O-Matic files to SVG
-- BMessage-based IOM format parsing
-- Named elements support (preserve as SVG IDs with --names flag)
-- Full transformation matrices and gradient interpolation
-
-**svg2iom** - Convert SVG files to Icon-O-Matic format
-- Complete SVG path parsing with BMessage output
-- Gradient conversion with transformations
-- Preserves vector quality
-
-**iom2hvif** - Convert Icon-O-Matic files to HVIF format (Haiku only)
-- Native Haiku implementation using Haiku API
-- Direct IOM to HVIF conversion without intermediate formats
-- Write icons to HVIF files or file/folder attributes
-- Batch processing support for multiple files
-- Based on Haiku Icon-O-Matic implementation
-
-**img2svg** - Advanced bitmap to SVG vectorization
-- Color quantization with adaptive palettes
-- Multiple simplification algorithms (Douglas-Peucker, Visvalingam-Whyatt)
-- Geometric shape detection
-- Background removal with auto-detection
-- Gradient detection and region merging
+**`img2svg`** - Advanced bitmap to SVG vectorization.
+- Color quantization with adaptive palettes.
+- Multiple simplification algorithms (Douglas-Peucker, Visvalingam-Whyatt).
+- Geometric shape detection.
+- Background removal with auto-detection.
+- Gradient detection and region merging.
 
 ### Integration
 
-**Inkscape Extensions** - Seamless HVIF/IOM import and export
-- Python-based extensions for Inkscape 1.0+
-- Requires corresponding CLI tools in PATH
+**Inkscape Extensions** - Seamless HVIF/IOM import and export.
+- Python-based extensions for Inkscape 1.0+.
+- Requires the `icon2icon` CLI tool in PATH.
 
-**Windows Thumbnail Provider** - Explorer integration
-- COM-based thumbnail generation for HVIF and IOM files
-- Requires registration via regsvr32
+**Windows Thumbnail Provider** - Explorer integration.
+- COM-based thumbnail generation for HVIF and IOM files.
+- Requires registration via `regsvr32`.
 
 ### Development Tools
 
-**msg2txt** - BMessage binary format dump utility
-- Structure and field enumeration
-- Optional value display and hex dump
-- Offset-based reading
+**`msgdump`** - BMessage binary format dump utility.
+- Structure and field enumeration.
+- Optional value display and hex dump.
+- Offset-based reading.
 
 ## Building
 
 ### Requirements
 
 - CMake 3.16 or later
-- C++ compiler
+- C++11 compliant compiler
 - Git (for submodules)
 
 External dependencies (included as submodules):
-- NanoSVG (header-only)
-- STB (header-only)
+- NanoSVG
+- STB
 
 Platform-specific dependencies:
-- **Haiku:** libagg (Anti-Grain Geometry), be library (for iom2hvif)
+- **Haiku:** `libagg_devel` library (for `iom2hvif`).
 
 ### Quick Start
 
@@ -86,30 +73,32 @@ cmake --build .
 
 ### Build Options
 
+**Libraries:**
+- `BUILD_HVIFTOOLS_LIB` - Build the libhviftools library (default: ON).
+- `BUILD_IMAGETRACER_LIB` - Build the libimagetracer library (default: ON).
+- `BUILD_SHARED_LIBS` - Build shared libraries instead of static ones (default: OFF).
+
 **Tools:**
-- `BUILD_ALL_TOOLS` - Build all CLI tools (default: ON)
-- `BUILD_HVIF2SVG` - Build hvif2svg converter (default: ON)
-- `BUILD_SVG2HVIF` - Build svg2hvif converter (default: ON)
-- `BUILD_IOM2SVG` - Build iom2svg converter (default: ON)
-- `BUILD_SVG2IOM` - Build svg2iom converter (default: ON)
-- `BUILD_IMG2SVG` - Build img2svg vectorizer (default: ON)
-- `BUILD_MSG2TXT` - Build msg2txt debug tool (default: OFF)
-- `BUILD_IOM2HVIF` - Build iom2hvif converter (default: ON on Haiku, unavailable elsewhere)
+- `BUILD_ICON2ICON` - Build the `icon2icon` universal converter (default: ON).
+- `BUILD_IMG2SVG` - Build the `img2svg` vectorizer (default: ON).
+- `BUILD_MSGDUMP` - Build the `msgdump` debug tool (default: OFF).
+- `BUILD_IOM2HVIF` - Build the `iom2hvif` converter (default: OFF, Haiku only).
 
 **Integration:**
-- `BUILD_HVIF4WIN` - Build Windows thumbnail provider (default: ON on Windows)
-- `BUILD_INKSCAPE_EXTENSIONS` - Install Inkscape extensions (default: OFF)
-- `INKSCAPE_EXT_DIR` - Custom Inkscape extensions directory (default: platform-specific)
+- `BUILD_HVIF4WIN` - Build Windows thumbnail provider (default: ON on Windows).
+- `BUILD_INKSCAPE_EXTENSIONS` - Install Inkscape extensions (default: OFF).
+- `INKSCAPE_EXT_DIR` - Custom Inkscape extensions directory (default: platform-specific).
 
 **Development:**
-- `HVIF_TOOLS_WARNINGS` - Enable extra compiler warnings (default: OFF)
-- `HVIF_TOOLS_WERROR` - Treat warnings as errors (default: OFF)
+- `HVIF_TOOLS_WARNINGS` - Enable extra compiler warnings (default: OFF).
+- `HVIF_TOOLS_WERROR` - Treat warnings as errors (default: OFF).
+- `HVIF_TOOLS_TESTS` - Build unit tests (default: OFF).
 
 ### Build Examples
 
-Build only HVIF converters:
+Build only the `icon2icon` converter:
 ```bash
-cmake -B build -DBUILD_ALL_TOOLS=OFF -DBUILD_HVIF2SVG=ON -DBUILD_SVG2HVIF=ON
+cmake -B build -DBUILD_IMG2SVG=OFF
 cmake --build build
 ```
 
@@ -137,7 +126,7 @@ cmake --build build
 
 Build full installation package for Windows:
 ```bash
-cmake -B build -DBUILD_INKSCAPE_EXTENSIONS=ON -DBUILD_MSG2TXT=ON
+cmake -B build -DBUILD_INKSCAPE_EXTENSIONS=ON -DBUILD_MSGDUMP=ON
 cd build
 cmake --build . --config=Release
 cpack -C Release -G NSIS
@@ -157,13 +146,12 @@ When `BUILD_INKSCAPE_EXTENSIONS=ON`, extensions are installed to platform-specif
 **Default paths:**
 - **Linux:** `~/.config/inkscape/extensions`
 - **macOS:** `~/Library/Application Support/org.inkscape.Inkscape/config/inkscape/extensions`
-- **Windows:** `%APPDATA%\inkscape\extensions`
+- **Windows:** Auto-detected by the installer (e.g. `%APPDATA%\inkscape\extensions`).
 - **Haiku:** `~/config/settings/inkscape/extensions`
 
 **Custom installation path:**
 
-Use `INKSCAPE_EXT_DIR` to override the default:
-```bash
+Use `INKSCAPE_EXT_DIR` to override the default:```bash
 cmake -B build -DBUILD_INKSCAPE_EXTENSIONS=ON -DINKSCAPE_EXT_DIR=/path/to/extensions
 cmake --install build
 ```
@@ -172,18 +160,24 @@ cmake --install build
 
 Copy extension files directly:
 ```bash
-cp inkscape/*.{py,inx} <inkscape-extensions-dir>/
-```
+cp inkscape/*.{py,inx} <inkscape-extensions-dir>/```
 
 ## Usage
 
 ### Basic Conversion
 
 ```bash
-hvif2svg icon.hvif icon.svg 256 256
-svg2hvif icon.svg icon.hvif
-iom2svg icon.iom icon.svg 128 128 --names
-svg2iom icon.svg icon.iom
+# HVIF to SVG
+icon2icon icon.hvif icon.svg
+
+# SVG to HVIF
+icon2icon icon.svg icon.hvif
+
+# IOM to SVG, preserving names
+icon2icon icon.iom icon.svg --names
+
+# SVG to IOM
+icon2icon icon.svg icon.iom
 ```
 
 ### Icon-O-Matic to HVIF (Haiku only)
@@ -218,42 +212,6 @@ iom2hvif --attr-name CUSTOM:ICON -a target.file icon.iom
 iom2hvif -v icon1.iom icon2.iom
 ```
 
-**iom2hvif options:**
-```
--o <file.hvif>      Write to HVIF file (single input only)
--a <target>         Write to target's attribute (single input only)
---attr-name <name>  Attribute name (default: BEOS:ICON)
--v, --verbose       Verbose output
--h, --help          Show help
-```
-
-**Example output:**
-
-Silent on success:
-```bash
-$ iom2hvif -o app.hvif app.iom
-$
-```
-
-Batch processing:
-```bash
-$ iom2hvif *.iom
-Processed 15 file(s): 15 succeeded, 0 failed
-```
-
-Verbose mode:
-```bash
-$ iom2hvif -v icon1.iom icon2.iom
-Processing [1/2]: icon1.iom
-  Styles: 2, Paths: 3, Shapes: 2
-  Done
-Processing [2/2]: icon2.iom
-  Styles: 1, Paths: 1, Shapes: 1
-  Done
-
-Processed 2 file(s): 2 succeeded, 0 failed
-```
-
 ### Bitmap Vectorization
 
 ```bash
@@ -265,9 +223,8 @@ img2svg --help
 ### Debug BMessage
 
 ```bash
-msg2txt example.msg       # Show BMessage structure
-msg2txt -o 4 -v icon.iom  # Show IOM BMessage structure with values
-msg2txt -x example.msg    # Hex dump
+msgdump message_file         # Show BMessage structure
+msgdump -o 4 -v icon.iom     # Show IOM BMessage structure with values, starting at offset 4
 ```
 
 ## Platform Notes
@@ -303,9 +260,9 @@ Install dependencies:
 pkgman install cmake gcc libagg_devel
 ```
 
-Build all tools including iom2hvif:
+Build all tools including `iom2hvif`:
 ```bash
-cmake -B build -DCMAKE_BUILD_TYPE=Release
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_IOM2HVIF=ON
 cmake --build build
 ```
 
