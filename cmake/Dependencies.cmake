@@ -58,6 +58,34 @@ else()
 endif()
 
 # ============================================================================
+# Haiku dependencies (iom2hvif)
+# ============================================================================
+
+if(BUILD_IOM2HVIF AND HAIKU)
+    find_package(PkgConfig)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(AGG REQUIRED libagg)
+        if(AGG_FOUND)
+            message(STATUS "Found libagg: ${AGG_INCLUDEDIR}")
+        endif()
+    else()
+        message(FATAL_ERROR "pkg-config is required for iom2hvif on Haiku")
+    endif()
+    
+    find_library(BE_LIBRARY be)
+    if(NOT BE_LIBRARY)
+        message(FATAL_ERROR "Haiku 'be' library not found")
+    endif()
+    message(STATUS "Found Haiku be library: ${BE_LIBRARY}")
+endif()
+
+if(BUILD_IOM2HVIF AND HAIKU AND AGG_FOUND)
+    add_library(haiku_agg INTERFACE)
+    target_include_directories(haiku_agg INTERFACE ${AGG_INCLUDEDIR})
+    target_link_libraries(haiku_agg INTERFACE ${AGG_LIBRARIES})
+endif()
+
+# ============================================================================
 # Disable builds if dependencies are missing
 # ============================================================================
 
@@ -72,4 +100,9 @@ if(BUILD_IMAGETRACER_LIB AND NOT STB_FOUND)
     message(WARNING "Disabling libimagetracer due to missing STB")
     set(BUILD_IMAGETRACER_LIB OFF CACHE BOOL "" FORCE)
     set(BUILD_IMG2SVG OFF CACHE BOOL "" FORCE)
+endif()
+
+if(BUILD_IOM2HVIF AND HAIKU AND NOT AGG_FOUND)
+    message(WARNING "Disabling iom2hvif due to missing libagg")
+    set(BUILD_IOM2HVIF OFF CACHE BOOL "" FORCE)
 endif()

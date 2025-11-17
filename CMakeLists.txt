@@ -7,7 +7,7 @@
 
 cmake_minimum_required(VERSION 3.16)
 
-project(hvif-tools 
+project(hvif-tools
     VERSION 2.1.0
     DESCRIPTION "Tools and libraries for Haiku Vector Icon Format"
     LANGUAGES CXX
@@ -31,13 +31,15 @@ option(BUILD_SHARED_LIBS "Build shared libraries instead of static" OFF)
 # Build options: CLI Tools
 # ============================================================================
 
-cmake_dependent_option(BUILD_ICON2ICON 
-    "Build icon2icon: Universal icon format converter" 
+cmake_dependent_option(BUILD_ICON2ICON
+    "Build icon2icon: Universal icon format converter"
     ON "BUILD_HVIFTOOLS_LIB" OFF)
 
-cmake_dependent_option(BUILD_IMG2SVG 
-    "Build img2svg: Bitmap to SVG vectorizer" 
+cmake_dependent_option(BUILD_IMG2SVG
+    "Build img2svg: Bitmap to SVG vectorizer"
     ON "BUILD_IMAGETRACER_LIB" OFF)
+
+option(BUILD_IOM2HVIF "Build iom2hvif: Icon-O-Matic to HVIF converter (Haiku only)" OFF)
 
 option(BUILD_MSGDUMP "Build msgdump: BMessage dump utility (debug tool)" OFF)
 
@@ -46,8 +48,8 @@ option(BUILD_MSGDUMP "Build msgdump: BMessage dump utility (debug tool)" OFF)
 # ============================================================================
 
 if(WIN32)
-    cmake_dependent_option(BUILD_HVIF4WIN 
-        "Build Windows thumbnail provider for HVIF/IOM files" 
+    cmake_dependent_option(BUILD_HVIF4WIN
+        "Build Windows thumbnail provider for HVIF/IOM files"
         ON "BUILD_HVIFTOOLS_LIB" OFF)
 else()
     set(BUILD_HVIF4WIN OFF CACHE BOOL "Windows thumbnail provider (Windows only)" FORCE)
@@ -80,7 +82,7 @@ cmake_dependent_option(BUILD_STRESS_TEST
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
-    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS 
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
         "Debug" "Release" "MinSizeRel" "RelWithDebInfo"
     )
 endif()

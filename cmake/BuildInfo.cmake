@@ -59,6 +59,12 @@ else()
     message(STATUS "  img2svg:          OFF")
 endif()
 
+if(TARGET iom2hvif)
+    message(STATUS "  iom2hvif:         ON")
+else()
+    message(STATUS "  iom2hvif:         OFF")
+endif()
+
 if(TARGET msgdump)
     message(STATUS "  msgdump:          ON")
 else()
@@ -159,6 +165,10 @@ endif()
 
 if(TARGET img2svg)
     list(APPEND _targets_list "img2svg")
+endif()
+
+if(TARGET iom2hvif)
+    list(APPEND _targets_list "iom2hvif")
 endif()
 
 if(TARGET msgdump)

@@ -6,7 +6,8 @@
 #
 
 if(NOT HAIKU)
-    message(WARNING "iom2hvif can only be built on Haiku")
+    message(STATUS "iom2hvif is disabled (Haiku only)")
+    set(BUILD_IOM2HVIF OFF CACHE BOOL "Icon-O-Matic to HVIF converter (Haiku only)" FORCE)
     return()
 endif()
 
@@ -50,4 +51,11 @@ set_target_properties(iom2hvif PROPERTIES
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "MinSizeRel")
     target_compile_options(iom2hvif PRIVATE -O3)
+endif()
+
+if(HVIF_TOOLS_INSTALL)
+    install(TARGETS iom2hvif
+        RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+        COMPONENT b_tools
+    )
 endif()

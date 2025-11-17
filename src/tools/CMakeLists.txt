@@ -16,3 +16,7 @@ endif()
 if(BUILD_MSGDUMP)
     add_subdirectory(msgdump)
 endif()
+
+if(BUILD_IOM2HVIF)
+    add_subdirectory(iom2hvif)
+endif()
