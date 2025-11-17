@@ -151,7 +151,8 @@ When `BUILD_INKSCAPE_EXTENSIONS=ON`, extensions are installed to platform-specif
 
 **Custom installation path:**
 
-Use `INKSCAPE_EXT_DIR` to override the default:```bash
+Use `INKSCAPE_EXT_DIR` to override the default:
+```bash
 cmake -B build -DBUILD_INKSCAPE_EXTENSIONS=ON -DINKSCAPE_EXT_DIR=/path/to/extensions
 cmake --install build
 ```
@@ -160,7 +161,8 @@ cmake --install build
 
 Copy extension files directly:
 ```bash
-cp inkscape/*.{py,inx} <inkscape-extensions-dir>/```
+cp inkscape/*.{py,inx} <inkscape-extensions-dir>/
+```
 
 ## Usage
 
