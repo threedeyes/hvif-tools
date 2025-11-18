@@ -15,6 +15,7 @@ namespace haiku {
 
 enum IconFormat {
 	FORMAT_AUTO,
+	FORMAT_UNKNOWN,
 	FORMAT_HVIF,
 	FORMAT_IOM,
 	FORMAT_SVG,

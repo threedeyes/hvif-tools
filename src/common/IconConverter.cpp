@@ -219,8 +219,13 @@ IconConverter::Convert(const std::string& inputFile, const std::string& outputFi
 IconFormat
 IconConverter::DetectFormat(const std::string& file)
 {
+	std::ifstream f(file.c_str(), std::ios::binary);
+	if (!f.is_open())
+		return FORMAT_UNKNOWN;
+	f.close();
+
 	IconFormat format = DetectFormatBySignature(file);
-	if (format != FORMAT_AUTO)
+	if (format != FORMAT_UNKNOWN)
 		return format;
 
 	return DetectFormatByExtension(file);
@@ -231,66 +236,61 @@ IconConverter::DetectFormatBySignature(const std::string& file)
 {
 	std::ifstream f(file.c_str(), std::ios::binary);
 	if (!f.is_open())
-		return FORMAT_AUTO;
+		return FORMAT_UNKNOWN;
 
-	std::vector<uint8_t> header(512);
+	std::vector<uint8_t> header(1024);
 	f.read(reinterpret_cast<char*>(&header[0]), header.size());
 	size_t bytesRead = f.gcount();
 	f.close();
 
 	if (bytesRead < 4)
-		return FORMAT_AUTO;
+		return FORMAT_UNKNOWN;
 
-	if (header[0] == 0x6E && header[1] == 0x63 && 
+	if (header[0] == 0x6E && header[1] == 0x63 &&
 		header[2] == 0x69 && header[3] == 0x66) {
 		return FORMAT_HVIF;
 	}
 
-	if (header[0] == 'I' && header[1] == 'M' && 
+	if (header[0] == 'I' && header[1] == 'M' &&
 		header[2] == 'S' && header[3] == 'G') {
 		return FORMAT_IOM;
 	}
 
-	if (header[0] == 0x89 && header[1] == 'P' && 
+	if (header[0] == 0x89 && header[1] == 'P' &&
 		header[2] == 'N' && header[3] == 'G') {
 		return FORMAT_PNG;
 	}
 
-	for (size_t i = 0; i < bytesRead && i < 100; ++i) {
-		if (header[i] == '<') {
-			if (i + 4 < bytesRead) {
-				if (header[i+1] == '?' && header[i+2] == 'x' && 
-					header[i+3] == 'm' && header[i+4] == 'l') {
-					for (size_t j = i + 5; j < bytesRead - 4; ++j) {
-						if (header[j] == '<' && header[j+1] == 's' && 
-							header[j+2] == 'v' && header[j+3] == 'g') {
-							return FORMAT_SVG;
-						}
-					}
-				}
+	std::string content(reinterpret_cast<const char*>(&header[0]), bytesRead);
+	std::transform(content.begin(), content.end(), content.begin(), ::tolower);
 
-				if (header[i+1] == 's' && header[i+2] == 'v' && 
-					header[i+3] == 'g' && (header[i+4] == ' ' || 
-					header[i+4] == '>' || header[i+4] == '\t' || 
-					header[i+4] == '\n' || header[i+4] == '\r')) {
-					return FORMAT_SVG;
-				}
-
-				if (header[i+1] == '!' && header[i+2] == '-' && header[i+3] == '-') {
-					size_t j = i + 4;
-					while (j < bytesRead - 3) {
-						if (header[j] == '-' && header[j+1] == '-' && header[j+2] == '>') {
-							i = j + 2;
-							break;
-						}
-						j++;
-					}
-				}
-			}
-		}
+	size_t pos = 0;
+	if (content.size() >= 3 && content.substr(0, 3) == "\xEF\xBB\xBF") {
+		pos = 3;
 	}
 
-	return FORMAT_AUTO;
+	while (pos < content.size() && (content[pos] == ' ' || content[pos] == '\t' ||
+		content[pos] == '\n' || content[pos] == '\r')) {
+		pos++;
+	}
+
+	std::string searchArea = content.substr(pos);
+
+	if (searchArea.find("<?xml") != std::string::npos &&
+		searchArea.find("svg") != std::string::npos) {
+		return FORMAT_SVG;
+	}
+
+	if (searchArea.find("<!doctype") != std::string::npos &&
+		searchArea.find("svg") != std::string::npos) {
+		return FORMAT_SVG;
+	}
+
+	if (searchArea.find("<svg") != std::string::npos) {
+		return FORMAT_SVG;
+	}
+
+	return FORMAT_UNKNOWN;
 }
 
 IconFormat
@@ -298,7 +298,7 @@ IconConverter::DetectFormatByExtension(const std::string& file)
 {
 	size_t dotPos = file.rfind('.');
 	if (dotPos == std::string::npos)
-		return FORMAT_HVIF;
+		return FORMAT_UNKNOWN;
 
 	std::string ext = file.substr(dotPos + 1);
 	std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
@@ -312,7 +312,7 @@ IconConverter::DetectFormatByExtension(const std::string& file)
 	else if (ext == "png")
 		return FORMAT_PNG;
 	else
-		return FORMAT_HVIF;
+		return FORMAT_UNKNOWN;
 }
 
 std::string
@@ -320,6 +320,7 @@ IconConverter::FormatToString(IconFormat format)
 {
 	switch (format) {
 		case FORMAT_AUTO: return "AUTO";
+		case FORMAT_UNKNOWN: return "UNKNOWN";
 		case FORMAT_HVIF: return "HVIF";
 		case FORMAT_IOM: return "IOM";
 		case FORMAT_SVG: return "SVG";

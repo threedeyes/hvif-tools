@@ -163,7 +163,7 @@ int main(int argc, char** argv)
 		std::cout << "File: " << inFile << "\n";
 		std::cout << "Detected format: " << haiku::IconConverter::FormatToString(detectedFormat) << "\n";
 		
-		if (opts.verbose) {
+		if (opts.verbose && detectedFormat != haiku::FORMAT_PNG && detectedFormat != haiku::FORMAT_UNKNOWN) {
 			haiku::Icon icon = haiku::IconConverter::Load(inFile, detectedFormat);
 			if (haiku::IconConverter::GetLastError().empty()) {
 				std::cout << "  Styles: " << icon.styles.size() << "\n";
