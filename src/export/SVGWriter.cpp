@@ -249,11 +249,12 @@ SVGWriter::_GradientToSVG(const Gradient& grad, const std::string& id,
 {
 	std::ostringstream svg;
 
-	bool isLinear = (grad.type == GRADIENT_LINEAR || grad.type == GRADIENT_CONIC ||
+	bool isLinear = (grad.type == GRADIENT_LINEAR || grad.type == GRADIENT_CONIC || 
 					 grad.type == GRADIENT_XY || grad.type == GRADIENT_SQRT_XY ||
 					 grad.type == GRADIENT_DIAMOND);
-	bool isInverted = (grad.type == GRADIENT_CONIC || grad.type == GRADIENT_XY ||
+	bool isInverted = (grad.type == GRADIENT_CONIC || grad.type == GRADIENT_XY || 
 					   grad.type == GRADIENT_SQRT_XY || grad.type == GRADIENT_DIAMOND);
+	bool isConic = (grad.type == GRADIENT_CONIC);
 
 	std::string tagName = isLinear ? "linearGradient" : "radialGradient";
 
@@ -266,7 +267,7 @@ SVGWriter::_GradientToSVG(const Gradient& grad, const std::string& id,
 	svg << " gradientUnits=\"userSpaceOnUse\"";
 
 	std::vector<double> m = _CombineGradientMatrix(grad, shape);
-
+	
 	svg << " gradientTransform=\"matrix("
 		<< _FormatMatrix(m[0]) << ","
 		<< _FormatMatrix(m[1]) << ","
@@ -276,13 +277,17 @@ SVGWriter::_GradientToSVG(const Gradient& grad, const std::string& id,
 		<< _FormatCoord(m[5] * HVIF_SCALE) << ")\"";
 
 	long baseCoord = 6528;
+	long conicCoord = baseCoord * 1.52;
 
 	if (isLinear) {
-		if (isInverted) {
-			svg << " x1=\"" << baseCoord << "\" x2=\"" << -baseCoord
+		if (isConic) {
+			svg << " x1=\"" << conicCoord << "\" x2=\"" << -conicCoord 
+				<< "\" y1=\"" << -baseCoord << "\" y2=\"" << -baseCoord << "\"";
+		} else if (isInverted) {
+			svg << " x1=\"" << baseCoord << "\" x2=\"" << -baseCoord 
 				<< "\" y1=\"" << -baseCoord << "\" y2=\"" << -baseCoord << "\"";
 		} else {
-			svg << " x1=\"" << -baseCoord << "\" x2=\"" << baseCoord
+			svg << " x1=\"" << -baseCoord << "\" x2=\"" << baseCoord 
 				<< "\" y1=\"" << -baseCoord << "\" y2=\"" << -baseCoord << "\"";
 		}
 	} else {
