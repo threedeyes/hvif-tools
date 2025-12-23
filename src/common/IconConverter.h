@@ -37,10 +37,18 @@ struct ConvertOptions {
 	bool pngRemoveBackground;
 	
 	ConvertOptions() 
-		: svgWidth(64), svgHeight(64), svgViewBox("0 0 64 64"),
-		preserveNames(false), verbose(false), coordinateScale(1.0f),
-		pngWidth(64), pngHeight(64), pngScale(1.0f),
-		pngPreset(PRESET_ICON), pngRemoveBackground(false) {}
+		: svgWidth(64)
+		, svgHeight(64)
+		, svgViewBox("0 0 6528 6528")
+		, preserveNames(false)
+		, verbose(false)
+		, coordinateScale(102.0f)
+		, pngWidth(64)
+		, pngHeight(64)
+		, pngScale(1.0f)
+		, pngPreset(PRESET_ICON)
+		, pngRemoveBackground(false)
+	{}
 };
 
 class IconConverter {

@@ -183,23 +183,7 @@ IconConverter::Convert(const std::string& inputFile, IconFormat inputFormat,
 	if (!sLastError.empty())
 		return false;
 
-	ConvertOptions adjustedOpts = opts;
-
-	if (actualOutputFormat == FORMAT_SVG) {
-		if (actualInputFormat == FORMAT_HVIF) {
-			adjustedOpts.svgViewBox = "0 0 6528 6528";
-			adjustedOpts.coordinateScale = 102.0f;
-		} else {
-			if (adjustedOpts.svgViewBox.empty() || adjustedOpts.svgViewBox == "0 0 6528 6528") {
-				adjustedOpts.svgViewBox = "0 0 64 64";
-			}
-			if (adjustedOpts.coordinateScale == 102.0f) {
-				adjustedOpts.coordinateScale = 1.0f;
-			}
-		}
-	}
-
-	return Save(icon, outputFile, actualOutputFormat, adjustedOpts);
+	return Save(icon, outputFile, actualOutputFormat, opts);
 }
 
 bool
@@ -519,24 +503,7 @@ IconConverter::ConvertBuffer(const std::vector<uint8_t>& inputData, IconFormat i
 	if (!sLastError.empty())
 		return false;
 
-	ConvertOptions adjustedOpts = opts;
-	if (outputFormat == FORMAT_SVG) {
-		if (actualInputFormat == FORMAT_HVIF || 
-			(actualInputFormat == FORMAT_AUTO && inputData.size() >= 4 &&
-			inputData[0] == 0x6E && inputData[1] == 0x63 && inputData[2] == 0x69 && inputData[3] == 0x66)) {
-			adjustedOpts.svgViewBox = "0 0 6528 6528";
-			adjustedOpts.coordinateScale = 102.0f;
-		} else {
-			if (adjustedOpts.svgViewBox.empty() || adjustedOpts.svgViewBox == "0 0 6528 6528") {
-				adjustedOpts.svgViewBox = "0 0 64 64";
-			}
-			if (adjustedOpts.coordinateScale == 102.0f) {
-				adjustedOpts.coordinateScale = 1.0f;
-			}
-		}
-	}
-
-	return SaveToBuffer(icon, outputData, outputFormat, adjustedOpts);
+	return SaveToBuffer(icon, outputData, outputFormat, opts);
 }
 
 bool

@@ -18,8 +18,13 @@ struct SVGWriterOptions {
 	std::string		viewBox;
 	float			coordinateScale;
 
-	SVGWriterOptions() : width(64), height(64), includeNames(false),
-		viewBox("0 0 64 64"), coordinateScale(1.0f) {}
+	SVGWriterOptions()
+		: width(64)
+		, height(64)
+		, includeNames(false)
+		, viewBox("0 0 6528 6528")
+		, coordinateScale(102.0f)
+	{}
 };
 
 class SVGWriter {
@@ -35,6 +40,7 @@ private:
 	bool			fIncludeNames;
 	float			fCoordinateScale;
 
+	std::string		_FormatCoord(double value);
 	std::string		_ColorToCSS(const Color& color);
 	float			_GetColorAlpha(const Color& color);
 	std::string		_GradientToSVG(const Gradient& grad, const std::string& id, const std::string& styleName);
