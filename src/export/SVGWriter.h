@@ -7,6 +7,7 @@
 #define EXPORT_SVG_WRITER_H
 
 #include <string>
+#include <vector>
 #include "HaikuIcon.h"
 
 namespace haiku {
@@ -41,13 +42,21 @@ private:
 	float			fCoordinateScale;
 
 	std::string		_FormatCoord(double value);
+	std::string		_FormatMatrix(double value);
 	std::string		_ColorToCSS(const Color& color);
 	float			_GetColorAlpha(const Color& color);
-	std::string		_GradientToSVG(const Gradient& grad, const std::string& id, const std::string& styleName);
+
+	std::string		_GradientToSVG(const Gradient& grad, const std::string& id,
+						const std::string& styleName, const Shape& shape);
 	std::string		_PathToSVG(const Path& path);
+	std::string		_PathToSVGTransformed(const Path& path, const Shape& shape);
 	std::string		_ShapeToSVG(const Shape& shape, const Icon& icon, int shapeIndex);
-	std::string		_TransformToSVG(const std::vector<double>& matrix);
 	std::string		_GenerateID();
+
+	bool			_HasGeometricTransform(const Shape& shape);
+	void			_TransformPoint(double& x, double& y, const Shape& shape);
+	double			_GetTransformScale(const Shape& shape);
+	std::vector<double>	_CombineGradientMatrix(const Gradient& grad, const Shape& shape);
 };
 
 }
