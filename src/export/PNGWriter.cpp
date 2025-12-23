@@ -167,9 +167,9 @@ PNGWriter::_GenerateSVGString(const Icon& icon, int width, int height)
 
 	opts.width = width;
 	opts.height = height;
-	opts.viewBox = "0 0 64 64";
+	opts.viewBox = "0 0 6528 6528";
 	opts.includeNames = false;
-	opts.coordinateScale = 1.0f;
+	opts.coordinateScale = 102.0f;
 
 	return writer.Write(icon, opts);
 }
