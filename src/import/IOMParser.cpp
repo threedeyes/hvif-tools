@@ -319,6 +319,31 @@ IOMParser::_ParseTransformer(const haiku_compat::BMessage& transMsg, Transformer
 		double width;
 		if (transMsg.FindDouble("width", &width) == haiku_compat::B_OK)
 			transformer.width = width;
+	} else if (name == "Affine") {
+		transformer.type = TRANSFORMER_AFFINE;
+
+		const void* matrix;
+		ssize_t matrixSize;
+		if (transMsg.FindData("matrix", haiku_compat::B_DOUBLE_TYPE, 
+							  &matrix, &matrixSize) == haiku_compat::B_OK) {
+			int count = matrixSize / sizeof(double);
+			if (count >= 6) {
+				const double* m = (const double*)matrix;
+				transformer.matrix.assign(m, m + 6);
+			}
+		}
+	} else if (name == "Perspective") {
+		transformer.type = TRANSFORMER_PERSPECTIVE;
+
+		transformer.matrix.clear();
+		for (int32_t i = 0; i < 9; i++) {
+			double value;
+			if (transMsg.FindDouble("matrix", i, &value) == haiku_compat::B_OK) {
+				transformer.matrix.push_back(value);
+			} else {
+				break;
+			}
+		}
 	}
 
 	return true;

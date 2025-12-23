@@ -286,8 +286,11 @@ HVIFAdapter::ConvertTransformer(const hvif::Transformer& t)
 		for (size_t i = 0; i < t.data.size(); ++i) {
 			trans.matrix.push_back(static_cast<double>(t.data[i]));
 		}
-	} else {
+	} else if (t.tag == hvif::PERSPECTIVE) {
 		trans.type = haiku::TRANSFORMER_PERSPECTIVE;
+		for (size_t i = 0; i < t.data.size(); ++i) {
+			trans.matrix.push_back(static_cast<double>(t.data[i]));
+		}
 	}
 
 	return trans;
@@ -312,8 +315,11 @@ HVIFAdapter::ConvertTransformerToHVIF(const haiku::Transformer& t)
 		for (size_t i = 0; i < t.matrix.size(); ++i) {
 			trans.data.push_back(static_cast<float>(t.matrix[i]));
 		}
-	} else {
+	} else if (t.type == haiku::TRANSFORMER_PERSPECTIVE) {
 		trans.tag = hvif::PERSPECTIVE;
+		for (size_t i = 0; i < t.matrix.size(); ++i) {
+			trans.data.push_back(static_cast<float>(t.matrix[i]));
+		}
 	}
 
 	return trans;

@@ -286,42 +286,78 @@ HVIFWriter::_WriteInternalPathData(std::vector<uint8_t>& buffer, const InternalP
 void
 HVIFWriter::_WriteShapeData(std::vector<uint8_t>& buffer, const Shape& shape)
 {
-	_WriteByte(buffer, 0x0A);
-	_WriteByte(buffer, shape.styleIndex);
-	_WriteByte(buffer, static_cast<uint8_t>(shape.pathIndices.size()));
-	for (size_t i = 0; i < shape.pathIndices.size(); ++i) {
-		_WriteByte(buffer, shape.pathIndices[i]);
-	}
+    _WriteByte(buffer, 0x0A);
+    _WriteByte(buffer, shape.styleIndex);
+    _WriteByte(buffer, static_cast<uint8_t>(shape.pathIndices.size()));
+    for (size_t i = 0; i < shape.pathIndices.size(); ++i) {
+        _WriteByte(buffer, shape.pathIndices[i]);
+    }
 
-	uint8_t flags = 0;
-	if (shape.hasTransform) flags |= SHAPE_FLAG_TRANSFORM;
-	if (!shape.transformers.empty()) flags |= SHAPE_FLAG_HAS_TRANSFORMERS;
-	_WriteByte(buffer, flags);
+    uint8_t flags = 0;
+    if (shape.hasTransform) 
+        flags |= SHAPE_FLAG_TRANSFORM;
+    if (shape.hasLOD)
+        flags |= SHAPE_FLAG_LOD;
+    if (!shape.transformers.empty()) 
+        flags |= SHAPE_FLAG_HAS_TRANSFORMERS;
+    _WriteByte(buffer, flags);
 
-	if (shape.hasTransform)
-		_WriteMatrix(buffer, shape.transform);
+    if (shape.hasTransform)
+        _WriteMatrix(buffer, shape.transform);
 
-	if (!shape.transformers.empty()) {
-		_WriteByte(buffer, static_cast<uint8_t>(shape.transformers.size()));
-		for (size_t i = 0; i < shape.transformers.size(); ++i) {
-			const Transformer& t = shape.transformers[i];
-			_WriteByte(buffer, static_cast<uint8_t>(t.tag));
+    if (shape.hasLOD) {
+        _WriteByte(buffer, shape.minLOD);
+        _WriteByte(buffer, shape.maxLOD);
+    }
 
-			int encodedWidth = static_cast<int>(utils::RoundToLong(t.width)) + 128;
-			encodedWidth = utils::clamp(encodedWidth, 0, 255);
-			if (encodedWidth == 128 && t.width > 0.0f)
-				encodedWidth = 129;
-			_WriteByte(buffer, static_cast<uint8_t>(encodedWidth));
+    if (!shape.transformers.empty()) {
+        _WriteByte(buffer, static_cast<uint8_t>(shape.transformers.size()));
+        for (size_t i = 0; i < shape.transformers.size(); ++i) {
+            const Transformer& t = shape.transformers[i];
+            _WriteByte(buffer, static_cast<uint8_t>(t.tag));
 
-			uint8_t lineOptions = static_cast<uint8_t>((t.lineCap << 4) | (t.lineJoin & 0x0F));
-			_WriteByte(buffer, lineOptions);
-
-			uint8_t encodedMiter = static_cast<uint8_t>(
-				utils::clamp<int>(static_cast<int>(utils::RoundToLong(t.miterLimit)), 0, 255)
-			);
-			_WriteByte(buffer, encodedMiter);
-		}
-	}
+            if (t.tag == AFFINE) {
+                for (int32_t j = 0; j < 6; j++) {
+                    float value = 0.0f;
+                    if (j < static_cast<int32_t>(t.data.size()))
+                        value = t.data[j];
+                    else if (j == 0 || j == 3)
+                        value = 1.0f;
+                    _WriteFloat24(buffer, value);
+                }
+            } else if (t.tag == CONTOUR) {
+                int encodedWidth = static_cast<int>(utils::RoundToLong(t.width)) + 128;
+                encodedWidth = utils::clamp(encodedWidth, 0, 255);
+                if (encodedWidth == 128 && t.width > 0.0f)
+                    encodedWidth = 129;
+                _WriteByte(buffer, static_cast<uint8_t>(encodedWidth));
+                _WriteByte(buffer, static_cast<uint8_t>(t.lineJoin & 0x0F));
+                uint8_t encodedMiter = static_cast<uint8_t>(
+                    utils::clamp<int>(static_cast<int>(utils::RoundToLong(t.miterLimit)), 0, 255)
+                );
+                _WriteByte(buffer, encodedMiter);
+            } else if (t.tag == PERSPECTIVE) {
+                for (int32_t j = 0; j < 9; j++) {
+                    float value = 0.0f;
+                    if (j < static_cast<int32_t>(t.data.size()))
+                        value = t.data[j];
+                    _WriteFloat24(buffer, value);
+                }
+            } else if (t.tag == STROKE) {
+                int encodedWidth = static_cast<int>(utils::RoundToLong(t.width)) + 128;
+                encodedWidth = utils::clamp(encodedWidth, 0, 255);
+                if (encodedWidth == 128 && t.width > 0.0f)
+                    encodedWidth = 129;
+                _WriteByte(buffer, static_cast<uint8_t>(encodedWidth));
+                uint8_t lineOptions = static_cast<uint8_t>((t.lineCap << 4) | (t.lineJoin & 0x0F));
+                _WriteByte(buffer, lineOptions);
+                uint8_t encodedMiter = static_cast<uint8_t>(
+                    utils::clamp<int>(static_cast<int>(utils::RoundToLong(t.miterLimit)), 0, 255)
+                );
+                _WriteByte(buffer, encodedMiter);
+            }
+        }
+    }
 }
 
 std::vector<uint8_t>

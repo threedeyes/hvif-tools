@@ -212,7 +212,7 @@ void
 IOMWriter::_AddGradientToMessage(haiku_compat::BMessage& msg, const Gradient& grad)
 {
 	msg.AddString("class", "Gradient");
-	msg.AddString("class", "Gradient"); // TODO: it's present in original Icon-O-Matic files, but why???
+	msg.AddString("class", "Gradient");
 
 	if (grad.hasTransform && grad.transform.size() >= 6) {
 		msg.AddData("transformation", haiku_compat::B_DOUBLE_TYPE, 
@@ -261,7 +261,7 @@ IOMWriter::_AddTransformerToMessage(haiku_compat::BMessage& msg, const Transform
 			msgPrivate.GetMessageHeader()->flags = TRANSFORMER_AFFINE_FLAGS;
 			msg.AddString("name", "Affine");
 			if (trans.matrix.size() >= 6) {
-				msg.AddData("transformation", haiku_compat::B_DOUBLE_TYPE,
+				msg.AddData("matrix", haiku_compat::B_DOUBLE_TYPE,
 					&trans.matrix[0], 6 * sizeof(double), true);
 			}
 			break;
@@ -275,6 +275,9 @@ IOMWriter::_AddTransformerToMessage(haiku_compat::BMessage& msg, const Transform
 		case TRANSFORMER_PERSPECTIVE:
 			msgPrivate.GetMessageHeader()->flags = TRANSFORMER_PERSPECTIVE_FLAGS;
 			msg.AddString("name", "Perspective");
+			for (size_t i = 0; i < 9 && i < trans.matrix.size(); i++) {
+				msg.AddDouble("matrix", trans.matrix[i]);
+			}
 			break;
 	}
 }

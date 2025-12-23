@@ -849,8 +849,11 @@ IconConverter::SaveHVIF(const Icon& icon, const std::string& file)
 				for (size_t k = 0; k < trans.matrix.size(); ++k) {
 					hvifTrans.data.push_back(static_cast<float>(trans.matrix[k]));
 				}
-			} else {
+			} else if (trans.type == TRANSFORMER_PERSPECTIVE) {
 				hvifTrans.tag = hvif::PERSPECTIVE;
+				for (size_t k = 0; k < trans.matrix.size(); ++k) {
+					hvifTrans.data.push_back(static_cast<float>(trans.matrix[k]));
+				}
 			}
 
 			hvifShape.transformers.push_back(hvifTrans);
@@ -1000,8 +1003,11 @@ IconConverter::SaveHVIFBuffer(const Icon& icon, std::vector<uint8_t>& buffer)
 				for (size_t k = 0; k < trans.matrix.size(); ++k) {
 					hvifTrans.data.push_back(static_cast<float>(trans.matrix[k]));
 				}
-			} else {
+			} else if (trans.type == TRANSFORMER_PERSPECTIVE) {
 				hvifTrans.tag = hvif::PERSPECTIVE;
+				for (size_t k = 0; k < trans.matrix.size(); ++k) {
+					hvifTrans.data.push_back(static_cast<float>(trans.matrix[k]));
+				}
 			}
 
 			hvifShape.transformers.push_back(hvifTrans);

@@ -344,8 +344,15 @@ HVIFParser::_ReadTransformers(std::vector<Transformer>& transformers, uint8_t co
 
 		switch (transformer.tag) {
 			case AFFINE:
-				_SetError("AFFINE transformer not implemented");
-				return false;
+				transformer.data.clear();
+				transformer.data.reserve(6);
+				for (int j = 0; j < 6; j++) {
+					std::vector<uint8_t> bytes;
+					if (!_ReadBytes(bytes, 3))
+						return false;
+					transformer.data.push_back(_ParseFloat24(&bytes[0]));
+				}
+				break;
 				
 			case CONTOUR: {
 				uint8_t width, lineJoin, miterLimit;
@@ -357,6 +364,17 @@ HVIFParser::_ReadTransformers(std::vector<Transformer>& transformers, uint8_t co
 				transformer.miterLimit = miterLimit;
 				break;
 			}
+
+			case PERSPECTIVE:
+				transformer.data.clear();
+				transformer.data.reserve(9);
+				for (int j = 0; j < 9; j++) {
+					std::vector<uint8_t> bytes;
+					if (!_ReadBytes(bytes, 3))
+						return false;
+					transformer.data.push_back(_ParseFloat24(&bytes[0]));
+				}
+				break;
 
 			case STROKE: {
 				uint8_t width, lineOptions, miterLimit;
