@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include "HaikuIcon.h"
+#include "HVIFWriter.h"
 #include "PNGParser.h"
 
 namespace haiku {
@@ -108,6 +109,8 @@ private:
 	static bool			SaveIOMBuffer(const Icon& icon, std::vector<uint8_t>& buffer);
 	static bool			SaveSVGBuffer(const Icon& icon, std::vector<uint8_t>& buffer, const ConvertOptions& opts);
 	static bool			SavePNGBuffer(const Icon& icon, std::vector<uint8_t>& buffer, const ConvertOptions& opts);
+
+	static bool			_PrepareHVIFWriter(const Icon& icon, hvif::HVIFWriter& writer);
 };
 
 }

@@ -728,13 +728,11 @@ IconConverter::LoadPNGBuffer(const std::vector<uint8_t>& data, const ConvertOpti
 }
 
 bool
-IconConverter::SaveHVIF(const Icon& icon, const std::string& file)
+IconConverter::_PrepareHVIFWriter(const Icon& icon, hvif::HVIFWriter& writer)
 {
 	Icon tmp = icon;
 	CleanupIconPaths(tmp);
 	DeduplicateIconPaths(tmp);
-
-	hvif::HVIFWriter writer;
 
 	std::vector<uint8_t> styleIndexMap;
 	std::vector<uint8_t> pathIndexMap;
@@ -757,7 +755,7 @@ IconConverter::SaveHVIF(const Icon& icon, const std::string& file)
 
 			for (size_t j = 0; j < grad.stops.size(); ++j) {
 				hvif::GradientStop stop;
-				stop.offset = static_cast<uint8_t>(grad.stops[j].offset * 255.0f);
+				stop.offset = static_cast<uint8_t>(grad.stops[j].offset * 255.0f + 0.5f);
 
 				hvif::Color stopColor;
 				stopColor.tag = hvif::RGBA;
@@ -860,9 +858,9 @@ IconConverter::SaveHVIF(const Icon& icon, const std::string& file)
 		}
 
 		hvifShape.minLOD = static_cast<uint8_t>(utils::clamp(
-			static_cast<int>(tmp.shapes[i].minLOD * 255.0f / 4.0f), 0, 255));
+			static_cast<int>(tmp.shapes[i].minLOD * 255.0f / 4.0f + 0.5f), 0, 255));
 		hvifShape.maxLOD = static_cast<uint8_t>(utils::clamp(
-			static_cast<int>(tmp.shapes[i].maxLOD * 255.0f / 4.0f), 0, 255));
+			static_cast<int>(tmp.shapes[i].maxLOD * 255.0f / 4.0f + 0.5f), 0, 255));
 		hvifShape.hasLOD = (hvifShape.minLOD != 0 || hvifShape.maxLOD != 255);
 
 		writer.AddShape(hvifShape);
@@ -873,8 +871,19 @@ IconConverter::SaveHVIF(const Icon& icon, const std::string& file)
 		return false;
 	}
 
+	return true;
+}
+
+bool
+IconConverter::SaveHVIF(const Icon& icon, const std::string& file)
+{
+	hvif::HVIFWriter writer;
+	
+	if (!_PrepareHVIFWriter(icon, writer))
+		return false;
+
 	if (!writer.WriteToFile(file)) {
-		SetError("Failed to write HVIF file");
+		SetError("Failed to write HVIF file: " + file);
 		return false;
 	}
 
@@ -884,148 +893,10 @@ IconConverter::SaveHVIF(const Icon& icon, const std::string& file)
 bool
 IconConverter::SaveHVIFBuffer(const Icon& icon, std::vector<uint8_t>& buffer)
 {
-	Icon tmp = icon;
-	CleanupIconPaths(tmp);
-	DeduplicateIconPaths(tmp);
-
 	hvif::HVIFWriter writer;
-
-	std::vector<uint8_t> styleIndexMap;
-	std::vector<uint8_t> pathIndexMap;
-
-	for (size_t i = 0; i < tmp.styles.size(); ++i) {
-		hvif::Style hvifStyle;
-		hvifStyle.isGradient = tmp.styles[i].isGradient;
-
-		if (hvifStyle.isGradient) {
-			const Gradient& grad = tmp.styles[i].gradient;
-			hvifStyle.gradient.type = static_cast<hvif::GradientTypes>(grad.type);
-			hvifStyle.gradient.flags = 0;
-			hvifStyle.gradient.hasMatrix = grad.hasTransform;
-
-			if (grad.hasTransform && grad.transform.size() >= 6) {
-				for (size_t j = 0; j < grad.transform.size(); ++j) {
-					hvifStyle.gradient.matrix.push_back(static_cast<float>(grad.transform[j]));
-				}
-			}
-
-			for (size_t j = 0; j < grad.stops.size(); ++j) {
-				hvif::GradientStop stop;
-				stop.offset = static_cast<uint8_t>(grad.stops[j].offset * 255.0f);
-
-				hvif::Color stopColor;
-				stopColor.tag = hvif::RGBA;
-				stopColor.data.push_back(grad.stops[j].color.Red());
-				stopColor.data.push_back(grad.stops[j].color.Green());
-				stopColor.data.push_back(grad.stops[j].color.Blue());
-				stopColor.data.push_back(grad.stops[j].color.Alpha());
-				stop.color = stopColor;
-
-				hvifStyle.gradient.stops.push_back(stop);
-			}
-		} else {
-			hvif::Color color;
-			color.tag = hvif::RGBA;
-			color.data.push_back(tmp.styles[i].solidColor.Red());
-			color.data.push_back(tmp.styles[i].solidColor.Green());
-			color.data.push_back(tmp.styles[i].solidColor.Blue());
-			color.data.push_back(tmp.styles[i].solidColor.Alpha());
-			hvifStyle.color = color;
-		}
-
-		uint8_t newIndex = writer.AddStyle(hvifStyle);
-		styleIndexMap.push_back(newIndex);
-	}
-
-	for (size_t i = 0; i < tmp.paths.size(); ++i) {
-		hvif::InternalPath hvifPath;
-		hvifPath.closed = tmp.paths[i].closed;
-
-		for (size_t j = 0; j < tmp.paths[i].points.size(); ++j) {
-			const PathPoint& pt = tmp.paths[i].points[j];
-
-			hvif::PathNode node;
-			node.x = static_cast<float>(pt.x);
-			node.y = static_cast<float>(pt.y);
-			node.x_in = static_cast<float>(pt.x_in);
-			node.y_in = static_cast<float>(pt.y_in);
-			node.x_out = static_cast<float>(pt.x_out);
-			node.y_out = static_cast<float>(pt.y_out);
-			hvifPath.nodes.push_back(node);
-		}
-
-		uint8_t newIndex = writer.AddInternalPath(hvifPath);
-		pathIndexMap.push_back(newIndex);
-	}
-
-	for (size_t i = 0; i < tmp.shapes.size(); ++i) {
-		hvif::Shape hvifShape;
-
-		if (tmp.shapes[i].styleIndex >= 0 && 
-			tmp.shapes[i].styleIndex < static_cast<int>(styleIndexMap.size())) {
-			hvifShape.styleIndex = styleIndexMap[tmp.shapes[i].styleIndex];
-		} else {
-			hvifShape.styleIndex = 0;
-		}
-
-		for (size_t j = 0; j < tmp.shapes[i].pathIndices.size(); ++j) {
-			int oldPathIndex = tmp.shapes[i].pathIndices[j];
-			if (oldPathIndex >= 0 && oldPathIndex < static_cast<int>(pathIndexMap.size())) {
-				hvifShape.pathIndices.push_back(pathIndexMap[oldPathIndex]);
-			}
-		}
-
-		hvifShape.hasTransform = tmp.shapes[i].hasTransform;
-		if (hvifShape.hasTransform && tmp.shapes[i].transform.size() >= 6) {
-			hvifShape.transformType = "matrix";
-			for (size_t j = 0; j < tmp.shapes[i].transform.size(); ++j) {
-				hvifShape.transform.push_back(static_cast<float>(tmp.shapes[i].transform[j]));
-			}
-		}
-
-		for (size_t j = 0; j < tmp.shapes[i].transformers.size(); ++j) {
-			const Transformer& trans = tmp.shapes[i].transformers[j];
-			hvif::Transformer hvifTrans;
-
-			if (trans.type == TRANSFORMER_STROKE) {
-				hvifTrans.tag = hvif::STROKE;
-				hvifTrans.width = static_cast<float>(trans.width);
-				hvifTrans.lineJoin = static_cast<uint8_t>(trans.lineJoin);
-				hvifTrans.lineCap = static_cast<uint8_t>(trans.lineCap);
-				hvifTrans.miterLimit = static_cast<uint8_t>(trans.miterLimit);
-			} else if (trans.type == TRANSFORMER_CONTOUR) {
-				hvifTrans.tag = hvif::CONTOUR;
-				hvifTrans.width = static_cast<float>(trans.width);
-				hvifTrans.lineJoin = static_cast<uint8_t>(trans.lineJoin);
-				hvifTrans.miterLimit = static_cast<uint8_t>(trans.miterLimit);
-			} else if (trans.type == TRANSFORMER_AFFINE) {
-				hvifTrans.tag = hvif::AFFINE;
-				for (size_t k = 0; k < trans.matrix.size(); ++k) {
-					hvifTrans.data.push_back(static_cast<float>(trans.matrix[k]));
-				}
-			} else if (trans.type == TRANSFORMER_PERSPECTIVE) {
-				hvifTrans.tag = hvif::PERSPECTIVE;
-				for (size_t k = 0; k < trans.matrix.size(); ++k) {
-					hvifTrans.data.push_back(static_cast<float>(trans.matrix[k]));
-				}
-			}
-
-			hvifShape.transformers.push_back(hvifTrans);
-		}
-
-		hvifShape.minLOD = static_cast<uint8_t>(utils::clamp(
-			static_cast<int>(tmp.shapes[i].minLOD * 255.0f / 4.0f), 0, 255));
-		hvifShape.maxLOD = static_cast<uint8_t>(utils::clamp(
-			static_cast<int>(tmp.shapes[i].maxLOD * 255.0f / 4.0f), 0, 255));
-		hvifShape.hasLOD = (hvifShape.minLOD != 0 || hvifShape.maxLOD != 255);
-
-		writer.AddShape(hvifShape);
-	}
-
-	if (!writer.CheckHVIFLimitations()) {
-		SetError("Icon exceeds HVIF format limitations (max 255 styles/paths/shapes)");
+	
+	if (!_PrepareHVIFWriter(icon, writer))
 		return false;
-	}
 
 	buffer = writer.WriteToBuffer();
 	if (buffer.empty()) {
