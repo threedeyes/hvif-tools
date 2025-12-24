@@ -269,7 +269,11 @@ IOMWriter::_AddTransformerToMessage(haiku_compat::BMessage& msg, const Transform
 		case TRANSFORMER_CONTOUR:
 			msgPrivate.GetMessageHeader()->flags = TRANSFORMER_CONTOUR_FLAGS;
 			msg.AddString("name", "Contour");
+			msg.AddInt32("line join", trans.lineJoin);
+			msg.AddInt32("inner join", 1);
 			msg.AddDouble("width", trans.width);
+			msg.AddDouble("miter limit", trans.miterLimit);
+			msg.AddDouble("inner miter limit", 1.01);
 			break;
 
 		case TRANSFORMER_PERSPECTIVE:

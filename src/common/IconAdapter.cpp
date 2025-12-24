@@ -281,6 +281,8 @@ HVIFAdapter::ConvertTransformer(const hvif::Transformer& t)
 	} else if (t.tag == hvif::CONTOUR) {
 		trans.type = haiku::TRANSFORMER_CONTOUR;
 		trans.width = t.width / 102.0;
+		trans.lineJoin = t.lineJoin;
+		trans.miterLimit = t.miterLimit;
 	} else if (t.tag == hvif::AFFINE) {
 		trans.type = haiku::TRANSFORMER_AFFINE;
 		for (size_t i = 0; i < t.data.size(); ++i) {
@@ -310,6 +312,8 @@ HVIFAdapter::ConvertTransformerToHVIF(const haiku::Transformer& t)
 	} else if (t.type == haiku::TRANSFORMER_CONTOUR) {
 		trans.tag = hvif::CONTOUR;
 		trans.width = static_cast<float>(t.width * 102.0);
+		trans.lineJoin = static_cast<uint8_t>(t.lineJoin);
+		trans.miterLimit = static_cast<uint8_t>(t.miterLimit);
 	} else if (t.type == haiku::TRANSFORMER_AFFINE) {
 		trans.tag = hvif::AFFINE;
 		for (size_t i = 0; i < t.matrix.size(); ++i) {

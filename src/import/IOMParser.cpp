@@ -317,8 +317,15 @@ IOMParser::_ParseTransformer(const haiku_compat::BMessage& transMsg, Transformer
 		transformer.type = TRANSFORMER_CONTOUR;
 
 		double width;
+		int32_t lineJoin;
+		double miterLimit;
+
 		if (transMsg.FindDouble("width", &width) == haiku_compat::B_OK)
 			transformer.width = width;
+		if (transMsg.FindInt32("line join", &lineJoin) == haiku_compat::B_OK)
+			transformer.lineJoin = lineJoin;
+		if (transMsg.FindDouble("miter limit", &miterLimit) == haiku_compat::B_OK)
+			transformer.miterLimit = miterLimit;
 	} else if (name == "Affine") {
 		transformer.type = TRANSFORMER_AFFINE;
 
