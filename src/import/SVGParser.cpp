@@ -100,20 +100,25 @@ SVGParser::_ProcessImage(NSVGimage* image, Icon& icon, const SVGParseOptions& op
 	}
 
 	for (NSVGshape* shape = image->shapes; shape != NULL; shape = shape->next) {
-		_ProcessShape(shape, state);
+		_ProcessShape(shape, image, state);
 	}
 
 	return true;
 }
 
 void
-SVGParser::_ProcessShape(NSVGshape* shape, ParseState& state)
+SVGParser::_ProcessShape(NSVGshape* shape, NSVGimage* image, ParseState& state)
 {
 	if (!(shape->flags & NSVG_FLAGS_VISIBLE))
 		return;
 
+	if (shape->mask != NULL) {
+		_ProcessMaskedShape(shape, state);
+		return;
+	}
+
 	std::string shapeName = "";
-	if (shape->id && shape->id[0] != '\0')
+	if (shape->id[0] != '\0')
 		shapeName = shape->id;
 
 	int fillStyleIndex = -1;
@@ -172,6 +177,56 @@ SVGParser::_ProcessShape(NSVGshape* shape, ParseState& state)
 			fillShape.name = shapeName;
 			state.icon->shapes.push_back(fillShape);
 		}
+	}
+}
+
+void
+SVGParser::_ProcessMaskedShape(NSVGshape* shape, ParseState& state)
+{
+	NSVGmask* mask = shape->mask;
+	if (!mask || !mask->shapes)
+		return;
+
+	int fillStyleIndex = -1;
+	float opacity = shape->opacity;
+
+	if (shape->fill.type != NSVG_PAINT_NONE) {
+		fillStyleIndex = _AddStyle(shape->fill, opacity, state);
+	} else if (shape->stroke.type != NSVG_PAINT_NONE) {
+		fillStyleIndex = _AddStyle(shape->stroke, opacity, state);
+	} else {
+		return;
+	}
+
+	for (NSVGshape* maskShape = mask->shapes; maskShape != NULL; maskShape = maskShape->next) {
+		if (!(maskShape->flags & NSVG_FLAGS_VISIBLE))
+			continue;
+
+		std::vector<int> pathIndices;
+		for (NSVGpath* path = maskShape->paths; path != NULL; path = path->next) {
+			int pathIndex = _ProcessPath(path, state);
+			if (pathIndex >= 0)
+				pathIndices.push_back(pathIndex);
+		}
+
+		if (pathIndices.empty())
+			continue;
+
+		Shape iconShape;
+		iconShape.styleIndex = fillStyleIndex;
+		iconShape.hasTransform = false;
+		iconShape.pathIndices = pathIndices;
+
+		if (maskShape->stroke.type != NSVG_PAINT_NONE && maskShape->strokeWidth > 0.0f) {
+			Transformer contour;
+			contour.type = TRANSFORMER_CONTOUR;
+			contour.width = maskShape->strokeWidth * state.scale;
+			contour.lineJoin = utils::MapJoinFromNanoSVG(maskShape->strokeLineJoin);
+			contour.miterLimit = maskShape->miterLimit;
+			iconShape.transformers.push_back(contour);
+		}
+
+		state.icon->shapes.push_back(iconShape);
 	}
 }
 

@@ -14,6 +14,7 @@ struct NSVGimage;
 struct NSVGshape;
 struct NSVGpaint;
 struct NSVGpath;
+struct NSVGmask;
 
 namespace haiku {
 
@@ -48,7 +49,8 @@ private:
 	};
 
 	bool		_ProcessImage(NSVGimage* image, Icon& icon, const SVGParseOptions& opts);
-	void		_ProcessShape(NSVGshape* shape, ParseState& state);
+	void		_ProcessShape(NSVGshape* shape, NSVGimage* image, ParseState& state);
+	void		_ProcessMaskedShape(NSVGshape* shape, ParseState& state);
 	int			_ProcessPath(NSVGpath* path, ParseState& state);
 	int			_AddStyle(const NSVGpaint& paint, float opacity, ParseState& state);
 	Color		_NSVGColorToHaiku(unsigned int color, float opacity);
