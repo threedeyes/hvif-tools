@@ -27,12 +27,14 @@ public:
 	struct PathMetadata {
 		int parentPathIndex;
 		int nestingLevel;
+		double area;
 		bool isHole;
 		bool clockwise;
 		
 		PathMetadata()
 			: parentPathIndex(-1)
 			, nestingLevel(0)
+			, area(0.0)
 			, isHole(false)
 			, clockwise(true)
 		{

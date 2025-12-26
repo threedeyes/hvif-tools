@@ -50,8 +50,8 @@ private:
 
 	std::string				_HexColor(unsigned char r, unsigned char g, unsigned char b);
 
-	double					_CalculateAdaptiveStrokeWidth(int imageWidth, int imageHeight,
-														  int paletteSize, double scale);
+	bool					_IsHoleTransparent(const std::vector<std::vector<double> >& path,
+											  const IndexedBitmap& indexed);
 };
 
 #endif

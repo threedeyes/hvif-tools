@@ -14,6 +14,7 @@
 #include <iostream>
 
 #include "SvgWriter.h"
+#include "MathUtils.h"
 
 static inline bool _NearlyEqual(double a, double b, double eps)
 {
@@ -49,28 +50,6 @@ SvgWriter::_HexColor(unsigned char r, unsigned char g, unsigned char b)
 	return std::string(buf);
 }
 
-double
-SvgWriter::_CalculateAdaptiveStrokeWidth(int imageWidth, int imageHeight, int paletteSize, double scale)
-{
-	double maxDimension = std::max(imageWidth, imageHeight) * scale;
-
-	if (maxDimension < 1.0) maxDimension = 1.0;
-
-	double baseStroke = 1.1 * std::log(maxDimension / 50.0 + 1.0) + 0.3;
-
-	double normalizedPalette = paletteSize / 32.0;
-	if (normalizedPalette > 2.0) normalizedPalette = 2.0;
-
-	double paletteFactor = 0.5 + 0.75 * (1.0 - std::exp(-normalizedPalette * 0.8));
-
-	double finalStroke = baseStroke * paletteFactor;
-
-	if (finalStroke < 0.5) finalStroke = 0;
-	if (finalStroke > 4.0) finalStroke = 4.0;
-
-	return finalStroke;
-}
-
 std::string
 SvgWriter::_ColorToSvgString(const std::vector<unsigned char>& color, double strokeWidth)
 {
@@ -87,11 +66,15 @@ SvgWriter::_ColorToSvgString(const std::vector<unsigned char>& color, double str
 
 	if (color[3] == 0) {
 		result << "fill=\"none\" stroke=\"none\" ";
-	} else if (opacity < 0.999) {
-		result << "fill=\"" << hexColor << "\" stroke=\"none\" opacity=\"" << opacity << "\" ";
+	} else if (color[3] < 255) {
+		result << "fill=\"" << hexColor << "\" stroke=\"none\" ";
+		if (opacity < 0.999) {
+			result << "opacity=\"" << opacity << "\" ";
+		}
 	} else {
-		result << "fill=\"" << hexColor << "\" stroke-linejoin=\"round\" stroke=\"" << hexColor
-			   << "\" stroke-width=\"" << strokeWidth << "\" ";
+		result << "fill=\"" << hexColor << "\" stroke=\"" << hexColor << "\" "
+			   << "stroke-width=\"1.5\" paint-order=\"stroke\" "
+			   << "stroke-linejoin=\"round\" stroke-linecap=\"round\" ";
 	}
 
 	return result.str();
@@ -153,7 +136,7 @@ SvgWriter::_WriteSvgPathString(std::ostringstream& stream,
 	float roundCoordinates = floor(options.fRoundCoordinates);
 
 	stream << "\n  <path " << description << fillPaint
-		   << "fill-rule=\"evenodd\" d=\"";
+		   << "d=\"";
 
 	stream << "M " << segments[0][1] * scale << " " << segments[0][2] * scale;
 
@@ -310,6 +293,75 @@ SvgWriter::_WriteLinearGradientDef(std::ostringstream& defs,
 	defs << "</linearGradient>";
 }
 
+struct RenderGroup {
+	int layerIndex;
+	int parentPathIndex;
+	double area;
+	std::vector<int> pathIndices;
+
+	bool operator<(const RenderGroup& other) const {
+		return area > other.area;
+	}
+};
+
+bool
+SvgWriter::_IsHoleTransparent(const std::vector<std::vector<double> >& path,
+							  const IndexedBitmap& indexed)
+{
+	if (path.empty()) return true;
+
+	double minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9;
+	for (size_t i = 0; i < path.size(); i++) {
+		if (path[i].size() < 2) continue;
+		minX = std::min(minX, path[i][1]);
+		maxX = std::max(maxX, path[i][1]);
+		minY = std::min(minY, path[i][2]);
+		maxY = std::max(maxY, path[i][2]);
+	}
+
+	int w = indexed.Width();
+	int h = indexed.Height();
+
+	for (int steps = 0; steps < 5; steps++) {
+		double checkY = minY + (maxY - minY) * (0.3 + 0.1 * steps);
+		int y = (int)checkY;
+		if (y < 0 || y >= h) continue;
+
+		std::vector<double> intersections;
+		for (size_t i = 0; i < path.size(); i++) {
+			double x1 = path[i][1], y1 = path[i][2];
+			double x2, y2;
+			if (path[i][0] == 1.0) { x2 = path[i][3]; y2 = path[i][4]; }
+			else { x2 = path[i][5]; y2 = path[i][6]; }
+
+			if ((y1 > checkY) != (y2 > checkY)) {
+				double x = (x2 - x1) * (checkY - y1) / (y2 - y1) + x1;
+				intersections.push_back(x);
+			}
+		}
+
+		std::sort(intersections.begin(), intersections.end());
+
+		for (size_t i = 0; i < intersections.size(); i += 2) {
+			if (i + 1 >= intersections.size()) break;
+			double midX = (intersections[i] + intersections[i+1]) * 0.5;
+			int x = (int)midX;
+			if (x < 0 || x >= w) continue;
+
+			int idx = indexed.Array()[y+1][x+1];
+			if (idx < 0)
+				return true;
+
+			const std::vector<unsigned char>& p = indexed.Palette()[idx];
+			if (MathUtils::IsTransparent(p[3])) return true;
+
+			return false;
+		}
+	}
+
+	return true;
+}
+
 std::string
 SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions& options)
 {
@@ -363,92 +415,78 @@ SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions&
 		svgStream << defs.str();
 	}
 
-	double adaptiveStrokeWidth = _CalculateAdaptiveStrokeWidth(indexedBitmap.Width(), indexedBitmap.Height(),
-															indexedBitmap.Palette().size(),	options.fScale);
-
-	std::map<double, std::pair<int, int> > zIndexMap;
-	double label;
-
-	std::map<int, int> originalPathCounts;
-
-	for (int k = 0; k < static_cast<int>(indexedBitmap.Layers().size()); k++) {
-		if (k < static_cast<int>(indexedBitmap.Palette().size()) && indexedBitmap.Palette()[k][3] == 0) {
-			continue;
-		}
-
-		int pathsAdded = 0;
-		for (int pathIndex = 0; pathIndex < static_cast<int>(indexedBitmap.Layers()[k].size()); pathIndex++) {
-			originalPathCounts[k]++;
-
-			if (!indexedBitmap.Layers()[k][pathIndex].empty()) {
-				if (!indexedBitmap.Layers()[k][pathIndex][0].empty()) {
-					label = k * (indexedBitmap.Layers()[k][pathIndex][0][2] * width) + indexedBitmap.Layers()[k][pathIndex][0][1];
-					zIndexMap[label] = std::make_pair(k, pathIndex);
-					pathsAdded++;
-				}
-			}
-		}
-	}
-
-	std::map<int, int> zIndexPathCounts;
-	for (std::map<double, std::pair<int, int> >::iterator it = zIndexMap.begin();
-		 it != zIndexMap.end(); ++it) {
-		zIndexPathCounts[it->second.first]++;
-	}
-
-	std::map<std::pair<int,int>, bool> processedPaths;
-
+	const std::vector<std::vector<std::vector<std::vector<double> > > >& layers = indexedBitmap.Layers();
 	const std::vector<std::vector<IndexedBitmap::PathMetadata> >& metadata = indexedBitmap.PathsMetadata();
 
-	int skippedTransparent = 0;
-	int skippedDuplicate = 0;
-	int skippedHole = 0;
-	int rendered = 0;
-	std::map<int, int> renderedPerLayer;
-	std::map<int, int> skippedHolesPerLayer;
+	std::vector<RenderGroup> renderQueue;
+	std::vector<std::map<int, std::vector<int> > > layerHoles(layers.size());
 
-	std::string description;
-	for (std::map<double, std::pair<int, int> >::iterator it = zIndexMap.begin();
-		 it != zIndexMap.end(); ++it) {
-		int layer = it->second.first;
-		int path = it->second.second;
-
-		if (layer >= static_cast<int>(indexedBitmap.Palette().size())) {
-			skippedTransparent++;
-			continue;
+	for (size_t k = 0; k < layers.size(); k++) {
+		if (k < indexedBitmap.Palette().size() && indexedBitmap.Palette()[k][3] == 0) {
+			continue; // Skip transparent layers
 		}
+		if (k >= metadata.size()) continue;
 
-		std::pair<int,int> pathKey(layer, path);
-		if (processedPaths.find(pathKey) != processedPaths.end()) {
-			skippedDuplicate++;
-			continue;
-		}
+		for (size_t i = 0; i < layers[k].size(); i++) {
+			if (layers[k][i].empty()) continue;
+			if (i >= metadata[k].size()) continue;
 
-		if (!metadata.empty() && layer < static_cast<int>(metadata.size()) &&
-			path < static_cast<int>(metadata[layer].size()) &&
-			metadata[layer][path].isHole) {
-			skippedHole++;
-			skippedHolesPerLayer[layer]++;
-			continue;
-		}
-
-		std::vector<int> pathGroup;
-		pathGroup.push_back(path);
-
-		if (!metadata.empty() && layer < static_cast<int>(metadata.size())) {
-			for (int p = 0; p < static_cast<int>(metadata[layer].size()); p++) {
-				if (metadata[layer][p].parentPathIndex == path &&
-					metadata[layer][p].isHole) {
-					pathGroup.push_back(p);
+			if (metadata[k][i].isHole) {
+				int parent = metadata[k][i].parentPathIndex;
+				if (parent != -1) {
+					layerHoles[k][parent].push_back((int)i);
 				}
 			}
 		}
+	}
+
+	for (size_t k = 0; k < layers.size(); k++) {
+		if (k < indexedBitmap.Palette().size() && indexedBitmap.Palette()[k][3] == 0) {
+			continue;
+		}
+		if (k >= metadata.size()) continue;
+
+		for (size_t i = 0; i < layers[k].size(); i++) {
+			if (layers[k][i].empty()) continue;
+			if (i >= metadata[k].size()) continue;
+
+			if (!metadata[k][i].isHole) {
+				RenderGroup group;
+				group.layerIndex = (int)k;
+				group.parentPathIndex = (int)i;
+				group.area = metadata[k][i].area;
+
+				group.pathIndices.push_back((int)i);
+
+				if (layerHoles[k].count((int)i)) {
+					const std::vector<int>& holes = layerHoles[k][(int)i];
+					for (size_t h = 0; h < holes.size(); h++) {
+						int holeIdx = holes[h];
+						if (_IsHoleTransparent(layers[k][holeIdx], indexedBitmap)) {
+							group.pathIndices.push_back(holeIdx);
+						}
+					}
+				}
+
+				renderQueue.push_back(group);
+			}
+		}
+	}
+
+	// Sort groups by parent area descending
+	std::sort(renderQueue.begin(), renderQueue.end());
+
+	std::string description;
+	for (size_t i = 0; i < renderQueue.size(); ++i) {
+		const RenderGroup& group = renderQueue[i];
+		int layer = group.layerIndex;
+		int parentPath = group.parentPathIndex;
 
 		if (options.fShowDescription) {
 			std::ostringstream descriptionStream;
-			descriptionStream << "desc=\"l " << layer << " p " << path;
-			if (pathGroup.size() > 1) {
-				descriptionStream << " +" << (pathGroup.size() - 1) << "h";
+			descriptionStream << "desc=\"l " << layer << " p " << parentPath;
+			if (group.pathIndices.size() > 1) {
+				descriptionStream << " +" << (group.pathIndices.size() - 1) << "h";
 			}
 			descriptionStream << "\" ";
 			description = descriptionStream.str();
@@ -456,29 +494,38 @@ SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions&
 			description = "";
 		}
 
-		std::string colorString = _ColorToSvgString(indexedBitmap.Palette()[layer], adaptiveStrokeWidth);
+		std::string colorString = _ColorToSvgString(indexedBitmap.Palette()[layer], 1.0);
+
 		const std::vector<std::vector<IndexedBitmap::LinearGradient> >& gradsRef = grads;
-		if (layer < static_cast<int>(gradsRef.size()) && path < static_cast<int>(gradsRef[layer].size()) && gradsRef[layer][path].valid) {
+		if (layer < static_cast<int>(gradsRef.size()) &&
+			parentPath < static_cast<int>(gradsRef[layer].size()) &&
+			gradsRef[layer][parentPath].valid) {
 			std::ostringstream gradientFill;
-			gradientFill << "fill=\"url(#lg_" << layer << "_" << path << ")\" ";
+			std::string gradUrl = "url(#lg_" + std::to_string(layer) + "_" + std::to_string(parentPath) + ")";
+
+			const auto& g = gradsRef[layer][parentPath];
+			bool isOpaque = (g.c1[3] >= 255 && g.c2[3] >= 255);
+
+			gradientFill << "fill=\"" << gradUrl << "\" ";
+
+			if (isOpaque) {
+				gradientFill << "stroke=\"" << gradUrl << "\" "
+							 << "stroke-width=\"1.5\" paint-order=\"stroke\" "
+							 << "stroke-linejoin=\"round\" stroke-linecap=\"round\" ";
+			} else {
+				gradientFill << "stroke=\"none\" ";
+			}
+
 			colorString = gradientFill.str();
 		}
 
-		if (pathGroup.size() > 1) {
-			_WriteSvgCompoundPath(svgStream, description, indexedBitmap.Layers()[layer],
-							   pathGroup, colorString, options);
+		if (group.pathIndices.size() > 1) {
+			_WriteSvgCompoundPath(svgStream, description, layers[layer],
+							   group.pathIndices, colorString, options);
 		} else {
-			_WriteSvgPathString(svgStream, description, indexedBitmap.Layers()[layer][path],
+			_WriteSvgPathString(svgStream, description, layers[layer][parentPath],
 							   colorString, options);
 		}
-
-		for (size_t g = 0; g < pathGroup.size(); g++) {
-			std::pair<int,int> key(layer, pathGroup[g]);
-			processedPaths[key] = true;
-		}
-
-		rendered++;
-		renderedPerLayer[layer]++;
 	}
 
 	svgStream << "\n</svg>\n";

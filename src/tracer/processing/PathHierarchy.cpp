@@ -222,6 +222,10 @@ PathHierarchy::_BuildNestingTree(
 		if (paths[i].empty())
 			continue;
 
+		double signedArea = _CalculateSignedArea(paths[i]);
+		metadata[i].area = std::fabs(signedArea);
+		metadata[i].clockwise = (signedArea < 0);
+
 		int directParent = -1;
 		double minParentArea = 1e30;
 
@@ -253,8 +257,5 @@ PathHierarchy::_BuildNestingTree(
 
 		metadata[i].nestingLevel = level;
 		metadata[i].isHole = (level % 2 == 1);
-
-		double area = _CalculateSignedArea(paths[i]);
-		metadata[i].clockwise = (area < 0);
 	}
 }
