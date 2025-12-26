@@ -8,7 +8,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(hvif-tools
-    VERSION 2.1.4
+    VERSION 2.1.5
     DESCRIPTION "Tools and libraries for Haiku Vector Icon Format"
     LANGUAGES CXX
 )
