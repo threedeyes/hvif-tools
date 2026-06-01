@@ -58,142 +58,111 @@ ImageTracer::BitmapToSvg(const BitmapData& bitmap, const TracingOptions& options
 IndexedBitmap
 ImageTracer::BitmapToTraceData(const BitmapData& bitmap, const TracingOptions& options)
 {
-	_ReportProgress(options, STAGE_STARTING, 0);
+    _ReportProgress(options, STAGE_STARTING, 0);
 
-	BitmapData processedBitmap = bitmap;
+    BitmapData processedBitmap = bitmap;
 
-	if (options.fRemoveBackground) {
-		_ReportProgress(options, STAGE_REMOVE_BACKGROUND, 5);
-		BackgroundRemover remover;
-		remover.SetColorTolerance(options.fBackgroundTolerance);
-		remover.SetMinBackgroundRatio(options.fMinBackgroundRatio);
-		processedBitmap = remover.RemoveBackground(processedBitmap,
-												  options.fBackgroundMethod,
-												  options.fBackgroundTolerance);
-	}
+    if (options.fRemoveBackground) {
+	_ReportProgress(options, STAGE_REMOVE_BACKGROUND, 5);
+	BackgroundRemover remover;
+	remover.SetColorTolerance(options.fBackgroundTolerance);
+	remover.SetMinBackgroundRatio(options.fMinBackgroundRatio);
+	processedBitmap = remover.RemoveBackground(processedBitmap,
+						  options.fBackgroundMethod,
+						  options.fBackgroundTolerance);
+    }
 
-	if (options.fBlurRadius > 0) {
-		_ReportProgress(options, STAGE_BLUR, 10);
-		SelectiveBlur blur;
-		processedBitmap = blur.BlurBitmap(processedBitmap,
-										options.fBlurRadius,
-										options.fBlurDelta);
-	}
+    if (options.fBlurRadius > 0) {
+	_ReportProgress(options, STAGE_BLUR, 10);
+	SelectiveBlur blur;
+	processedBitmap = blur.BlurBitmap(processedBitmap,
+					options.fBlurRadius,
+					options.fBlurDelta);
+    }
 
-	_ReportProgress(options, STAGE_CREATE_PALETTE, 15);
-	std::vector<std::vector<unsigned char> > palette =
-		_CreatePalette(processedBitmap, static_cast<int>(options.fNumberOfColors), options);
+    _ReportProgress(options, STAGE_CREATE_PALETTE, 15);
+    std::vector<std::vector<unsigned char> > palette =
+	_CreatePalette(processedBitmap, static_cast<int>(options.fNumberOfColors), options);
 
-	_ReportProgress(options, STAGE_QUANTIZE_COLORS, 25);
-	ColorQuantizer quantizer;
-	IndexedBitmap indexedBitmap = quantizer.QuantizeColors(processedBitmap, palette, options);
+    _ReportProgress(options, STAGE_QUANTIZE_COLORS, 25);
+    ColorQuantizer quantizer;
+    IndexedBitmap indexedBitmap = quantizer.QuantizeColors(processedBitmap, palette, options);
 
-	if (options.fDetectGradients) {
-		_ReportProgress(options, STAGE_MERGE_REGIONS, 30);
-		RegionMerger merger;
-		indexedBitmap = merger.MergeRegions(indexedBitmap, processedBitmap, options);
-	}
+    if (options.fDetectGradients) {
+	_ReportProgress(options, STAGE_MERGE_REGIONS, 30);
+	RegionMerger merger;
+	indexedBitmap = merger.MergeRegions(indexedBitmap, processedBitmap, options);
+    }
 
-	_ReportProgress(options, STAGE_SCAN_PATHS, 35);
-	PathScanner pathScanner;
-	std::vector<std::vector<std::vector<int> > > rawLayers =
-		pathScanner.CreateLayers(indexedBitmap);
+    _ReportProgress(options, STAGE_SCAN_PATHS, 35);
+    PathScanner pathScanner;
+    std::vector<std::vector<std::vector<int> > > rawLayers =
+	pathScanner.CreateLayers(indexedBitmap);
 
-	std::vector<std::vector<std::vector<std::vector<int> > > > batchPaths =
-		pathScanner.ScanLayerPaths(rawLayers, options);
+    std::vector<std::vector<std::vector<std::vector<int> > > > batchPaths =
+	pathScanner.ScanLayerPaths(rawLayers, options);
 
-	std::vector<std::vector<std::vector<std::vector<double> > > > batchInternodes =
-		pathScanner.CreateInternodes(batchPaths);
+    std::vector<std::vector<std::vector<std::vector<double> > > > batchInternodes =
+	pathScanner.CreateInternodes(batchPaths);
 
-	if (options.fVisvalingamWhyattEnabled) {
-		_ReportProgress(options, STAGE_SIMPLIFY_VW, 45);
-		VisvalingamWhyatt vw;
-		batchInternodes = vw.BatchSimplifyLayerInternodes(batchInternodes, options.fVisvalingamWhyattTolerance);
-	}
+    SharedEdgeRegistry registry;
+    registry.BuildTopology(batchInternodes);
 
-	_ReportProgress(options, STAGE_TRACE_PATHS, 50);
-	PathTracer tracer;
-	std::vector<std::vector<std::vector<std::vector<double> > > > layers(batchInternodes.size());
-	for (int k = 0; k < static_cast<int>(batchInternodes.size()); k++) {
-		layers[k] = tracer.BatchTracePaths(batchInternodes[k],
-										  options.fLineThreshold,
-										  options.fQuadraticThreshold);
-	}
+    if (options.fVisvalingamWhyattEnabled) {
+	_ReportProgress(options, STAGE_SIMPLIFY_VW, 45);
+	VisvalingamWhyatt vw;
+	batchInternodes = vw.BatchSimplifyLayerInternodes(batchInternodes, options.fVisvalingamWhyattTolerance);
+    }
 
-	bool needSimplification = options.fFilterSmallObjects ||
-							   options.fDouglasPeuckerEnabled ||
-							   options.fCollinearTolerance > 0 ||
-							   options.fMinSegmentLength > 0 ||
-							   options.fCurveSmoothing > 0;
+    bool needSimplification = options.fDouglasPeuckerEnabled ||
+			      options.fCollinearTolerance > 0 ||
+			      options.fMinSegmentLength > 0 ||
+			      options.fCurveSmoothing > 0;
 
-	SharedEdgeRegistry* masterRegistry = NULL;
+    if (needSimplification) {
+	_ReportProgress(options, STAGE_SIMPLIFY_DP, 50);
+	PathSimplifier simplifier;
+	batchInternodes = simplifier.BatchSimplifyPoints(batchInternodes, options, &registry);
+    }
 
-	try {
-		masterRegistry = new SharedEdgeRegistry(16.0);
+    _ReportProgress(options, STAGE_TRACE_PATHS, 60);
+    PathTracer tracer;
+    std::vector<std::vector<std::vector<std::vector<double> > > > layers = tracer.BatchTracePaths(batchInternodes,
+					  options.fLineThreshold,
+					  options.fQuadraticThreshold,
+					  &registry);
 
-		if (needSimplification) {
-			if (options.fFilterSmallObjects) {
-				_ReportProgress(options, STAGE_FILTER_SMALL, 60);
-				PathSimplifier simplifier;
-				layers = simplifier.BatchFilterSmallObjects(layers, options);
-			}
+    PathSimplifier simplifier2;
+    if (options.fFilterSmallObjects) {
+	_ReportProgress(options, STAGE_FILTER_SMALL, 65);
+	layers = simplifier2.BatchFilterSmallObjects(layers, options);
+    }
 
-			if (options.fDouglasPeuckerEnabled) {
-				_ReportProgress(options, STAGE_SIMPLIFY_DP, 65);
-				PathSimplifier simplifier;
-				layers = simplifier.BatchLayerDouglasPeucker(layers, options);
-			}
+    if (options.fDetectGeometry) {
+	_ReportProgress(options, STAGE_DETECT_GEOMETRY, 75);
+	GeometryDetector detector;
+	layers = detector.BatchLayerGeometryDetection(layers, options);
+    }
 
-			if (options.fCollinearTolerance > 0 ||
-				options.fMinSegmentLength > 0 ||
-				options.fCurveSmoothing > 0) {
+    _ReportProgress(options, STAGE_UNIFY_EDGES, 80);
+    indexedBitmap.SetLayers(layers);
 
-				_ReportProgress(options, STAGE_SIMPLIFY_ADVANCED, 70);
-				masterRegistry->RegisterPaths(layers, indexedBitmap);
-				masterRegistry->UnifyCoordinates(0.25);
+    _ReportProgress(options, STAGE_FIX_WINDING, 85);
+    PathHierarchy hierarchy;
+    hierarchy.AnalyzeHierarchy(indexedBitmap);
 
-				PathSimplifier simplifier;
-				layers = simplifier.BatchTracePathsWithSimplification(layers, options, masterRegistry);
-			}
-		}
+    _FixWindingOrder(indexedBitmap);
 
-		if (options.fDetectGeometry) {
-			_ReportProgress(options, STAGE_DETECT_GEOMETRY, 75);
-			GeometryDetector detector;
-			layers = detector.BatchLayerGeometryDetection(layers, options);
-		}
+    if (options.fDetectGradients) {
+	_ReportProgress(options, STAGE_DETECT_GRADIENTS, 90);
+	GradientDetector grad;
+	std::vector<std::vector<IndexedBitmap::LinearGradient> > grads =
+	    grad.DetectLinearGradients(indexedBitmap, processedBitmap, layers, options);
+	indexedBitmap.SetLinearGradients(grads);
+    }
 
-		_ReportProgress(options, STAGE_UNIFY_EDGES, 80);
-		masterRegistry->RegisterPaths(layers, indexedBitmap);
-		masterRegistry->UnifyCoordinates(0.15);
-		masterRegistry->UpdatePaths(layers);
-
-		delete masterRegistry;
-		masterRegistry = NULL;
-
-	} catch (...) {
-		delete masterRegistry;
-		throw;
-	}
-
-	indexedBitmap.SetLayers(layers);
-
-	_ReportProgress(options, STAGE_FIX_WINDING, 85);
-	PathHierarchy hierarchy;
-	hierarchy.AnalyzeHierarchy(indexedBitmap);
-
-	_FixWindingOrder(indexedBitmap);
-
-	if (options.fDetectGradients) {
-		_ReportProgress(options, STAGE_DETECT_GRADIENTS, 90);
-		GradientDetector grad;
-		std::vector<std::vector<IndexedBitmap::LinearGradient> > grads =
-			grad.DetectLinearGradients(indexedBitmap, processedBitmap, layers, options);
-		indexedBitmap.SetLinearGradients(grads);
-	}
-
-	_ReportProgress(options, STAGE_COMPLETE, 100);
-	return indexedBitmap;
+    _ReportProgress(options, STAGE_COMPLETE, 100);
+    return indexedBitmap;
 }
 
 void

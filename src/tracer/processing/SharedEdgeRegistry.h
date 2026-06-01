@@ -1,5 +1,5 @@
 /*
- * Copyright 2025, Gerasim Troeglazov, 3dEyes@gmail.com. All rights reserved.
+ * Copyright 2025-2026, Gerasim Troeglazov, 3dEyes@gmail.com. All rights reserved.
  * Distributed under the terms of the MIT License.
  */
 
@@ -8,67 +8,47 @@
 
 #include <vector>
 #include <map>
-
-#include "IndexedBitmap.h"
+#include <set>
+#include <utility>
 
 class SharedEdgeRegistry {
 public:
-							SharedEdgeRegistry();
-	explicit				SharedEdgeRegistry(double gridResolution);
-							~SharedEdgeRegistry();
+			    SharedEdgeRegistry();
+			    ~SharedEdgeRegistry();
 
-	void					RegisterPaths(const std::vector<std::vector<std::vector<std::vector<double> > > >& layers,
-					   					const IndexedBitmap& indexed);
+    void					BuildTopology(const std::vector<std::vector<std::vector<std::vector<double> > > >& rawLayers);
+    bool					IsJunction(double x, double y) const;
 
-	void					UnifyCoordinates(double snapTolerance);
-
-	void					UpdatePaths(std::vector<std::vector<std::vector<std::vector<double> > > >& layers);
-
-	bool					IsSharedPoint(int layer, int path, int segment, int pointType) const;
-
-	bool					GetUnifiedCoordinate(int layer, int path, int segment, int pointType,
-												double& outX, double& outY) const;
-
-	void					GetSharedSegmentMask(int layer, int path, std::vector<bool>& sharedMask) const;
+    void					SaveCurve(double x1, double y1, double x2, double y2, double cx, double cy);
+    bool					LoadCurve(double x1, double y1, double x2, double y2, double& cx, double& cy) const;
 
 private:
-	struct PointKey {
-		int gx, gy;
+    struct PointKey {
+	int x, y;
+	bool operator<(const PointKey& o) const {
+	    if (x != o.x) return x < o.x;
+	    return y < o.y;
+	}
+	bool operator==(const PointKey& o) const {
+	    return x == o.x && y == o.y;
+	}
+    };
 
-		PointKey(int x, int y) : gx(x), gy(y) {}
+    struct EdgeKey {
+	PointKey p1, p2;
+	bool operator<(const EdgeKey& o) const {
+	    if (p1 < o.p1) return true;
+	    if (o.p1 < p1) return false;
+	    return p2 < o.p2;
+	}
+    };
 
-		bool operator<(const PointKey& o) const {
-			if (gx != o.gx) return gx < o.gx;
-			return gy < o.gy;
-		}
-	};
+    PointKey				_MakePointKey(double x, double y) const;
+    EdgeKey					_MakeEdgeKey(double x1, double y1, double x2, double y2) const;
 
-	struct PathReference {
-		int layer;
-		int path;
-		int segment;
-		int pointType;
-
-		PathReference(int l, int p, int s, int t)
-			: layer(l), path(p), segment(s), pointType(t) {}
-	};
-
-	struct EdgePoint {
-		double sumX, sumY;
-		int count;
-		double unifiedX, unifiedY;
-		std::vector<PathReference> owners;
-
-		EdgePoint() : sumX(0), sumY(0), count(0), unifiedX(0), unifiedY(0) {}
-	};
-
-	PointKey				_MakeKey(double x, double y) const;
-	void					_SnapToGrid(double& x, double& y, double tolerance) const;
-	void					_RegisterPoint(double x, double y, int layer, int path, int segment, int pointType);
-	bool					_IsSharedBetweenPaths(const EdgePoint& ep) const;
-
-	std::map<PointKey, EdgePoint> fPoints;
-	double					fGridResolution;
+    std::map<EdgeKey, std::set<int> > fEdgeUsers;
+    std::set<PointKey>		fJunctions;
+    std::map<EdgeKey, std::pair<double, double> > fCurves;
 };
 
 #endif
