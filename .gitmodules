@@ -5,3 +5,6 @@
 [submodule "external/nanosvg_ext"]
 	path = external/nanosvg_ext
 	url = https://github.com/threedeyes/nanosvg_ext
+[submodule "external/cpp-httplib"]
+	path = external/cpp-httplib
+	url = https://github.com/yhirose/cpp-httplib

@@ -11,6 +11,7 @@ endif()
 
 if(BUILD_IMG2SVG)
     add_subdirectory(img2svg)
+    add_subdirectory(img2svg-server)
 endif()
 
 if(BUILD_MSGDUMP)
