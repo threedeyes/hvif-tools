@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>img2svg Studio</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .checkerboard {
+            background-color: #1f2937;
+            background-image: linear-gradient(45deg, #374151 25%, transparent 25%, transparent 75%, #374151 75%, #374151), 
+                              linear-gradient(45deg, #374151 25%, transparent 25%, transparent 75%, #374151 75%, #374151);
+            background-size: 20px 20px;
+            background-position: 0 0, 10px 10px;
+        }
+        input[type=range] { accent-color: #3b82f6; }
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+        details > summary::-webkit-details-marker { display: none; }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 h-screen flex overflow-hidden select-none">
+
+    <div class="w-[380px] min-w-[380px] bg-gray-800 border-r border-gray-700 flex flex-col h-full shadow-xl z-20 overflow-y-auto">
+        <div class="p-4 border-b border-gray-700 bg-gray-800 sticky top-0 z-20 shadow">
+            <h1 class="text-xl font-bold text-blue-400 flex items-center mb-4">
+                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                img2svg Studio
+            </h1>
+            
+            <input type="file" id="imageInput" accept="image/*" class="block w-full text-sm text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer mb-4">
+            
+            <button type="button" id="processBtn" disabled class="w-full bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-bold py-2 px-4 rounded shadow transition flex justify-center items-center">
+                <span>Vectorize</span>
+                <svg id="loadingSpinner" class="animate-spin ml-2 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            </button>
+
+            <hr class="border-gray-700 my-4">
+
+            <div class="flex flex-col space-y-2">
+                <div class="flex items-center justify-between">
+                    <label class="text-xs text-gray-400 font-bold uppercase tracking-wider">Presets</label>
+                    <div class="flex space-x-1">
+                        <button type="button" id="btnSavePreset" title="Save as new preset" class="p-1 rounded text-gray-400 hover:text-white hover:bg-gray-700 transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                        </button>
+                        <button type="button" id="btnDeletePreset" title="Delete current preset" class="p-1 rounded text-gray-400 hover:text-red-400 hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        </button>
+                        <button type="button" id="btnResetPreset" title="Restore preset values" class="p-1 rounded text-gray-400 hover:text-blue-400 hover:bg-gray-700 transition">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                        </button>
+                    </div>
+                </div>
+                <select id="presetSelect" class="w-full bg-gray-900 text-sm rounded border border-gray-600 outline-none p-1 text-white shadow-inner">
+                    <option value="default">Default Settings</option>
+                </select>
+            </div>
+        </div>
+
+        <form id="vectorizeForm" class="flex-1 pb-10">
+            <!-- GROUP: Colors -->
+            <details class="group border-b border-gray-700" open>
+                <summary class="flex justify-between items-center font-semibold cursor-pointer p-4 hover:bg-gray-700 bg-gray-800/50">
+                    Color Quantization
+                    <span class="transition group-open:rotate-180"><svg fill="none" height="24" stroke="currentColor" viewBox="0 0 24 24" width="24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></span>
+                </summary>
+                <div class="p-4 pt-0 space-y-4">
+                    <div class="flex justify-between"><label class="text-sm">Max Colors</label><span id="colorsVal" class="text-sm text-blue-400">16</span></div>
+                    <input type="range" name="colors" min="2" max="256" value="16" class="w-full" oninput="document.getElementById('colorsVal').innerText = this.value">
+                    <div class="flex justify-between"><label class="text-sm">Quantization Cycles</label><span id="cycVal" class="text-sm text-blue-400">16</span></div>
+                    <input type="range" name="colorquantcycles" min="1" max="50" value="16" class="w-full" oninput="document.getElementById('cycVal').innerText = this.value">
+                </div>
+            </details>
+
+            <!-- GROUP: Tracing Base -->
+            <details class="group border-b border-gray-700">
+                <summary class="flex justify-between items-center font-semibold cursor-pointer p-4 hover:bg-gray-700 bg-gray-800/50">
+                    Basic Tracing
+                    <span class="transition group-open:rotate-180"><svg fill="none" height="24" stroke="currentColor" viewBox="0 0 24 24" width="24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></span>
+                </summary>
+                <div class="p-4 pt-0 space-y-4">
+                    <div class="flex justify-between"><label class="text-sm">Line Threshold</label><span id="ltresVal" class="text-sm text-blue-400">2.0</span></div>
+                    <input type="range" name="ltres" min="0.1" max="10.0" step="0.1" value="2.0" class="w-full" oninput="document.getElementById('ltresVal').innerText = this.value">
+                    <div class="flex justify-between"><label class="text-sm">Quad Threshold</label><span id="qtresVal" class="text-sm text-blue-400">0.5</span></div>
+                    <input type="range" name="qtres" min="0.1" max="5.0" step="0.1" value="0.5" class="w-full" oninput="document.getElementById('qtresVal').innerText = this.value">
+                    <div class="flex justify-between"><label class="text-sm">Path Omit Area</label><span id="omitVal" class="text-sm text-blue-400">10</span></div>
+                    <input type="range" name="pathomit" min="0" max="100" value="10" class="w-full" oninput="document.getElementById('omitVal').innerText = this.value">
+                </div>
+            </details>
+
+            <!-- GROUP: Background -->
+            <details class="group border-b border-gray-700">
+                <summary class="flex justify-between items-center font-semibold cursor-pointer p-4 hover:bg-gray-700 bg-gray-800/50">
+                    Background Removal
+                    <span class="transition group-open:rotate-180"><svg fill="none" height="24" stroke="currentColor" viewBox="0 0 24 24" width="24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></span>
+                </summary>
+                <div class="p-4 pt-0 space-y-4">
+                    <label class="flex items-center space-x-2"><input type="checkbox" name="remove_bg" value="true" class="form-checkbox h-4 w-4 text-blue-600 rounded"><span class="text-sm">Enable BG Removal</span></label>
+                    <div class="flex justify-between"><label class="text-sm">Detection Method</label>
+                        <select name="bg_method" class="bg-gray-700 text-sm rounded border border-gray-600 outline-none"><option value="1">Auto</option><option value="0">Simple (Corners)</option></select>
+                    </div>
+                    <div class="flex justify-between"><label class="text-sm">Tolerance</label><span id="bgTolVal" class="text-sm text-blue-400">10</span></div>
+                    <input type="range" name="bg_tolerance" min="0" max="100" value="10" class="w-full" oninput="document.getElementById('bgTolVal').innerText = this.value">
+                    <div class="flex justify-between"><label class="text-sm">Min BG Ratio</label><span id="bgRatVal" class="text-sm text-blue-400">0.3</span></div>
+                    <input type="range" name="bg_ratio" min="0" max="1" step="0.05" value="0.3" class="w-full" oninput="document.getElementById('bgRatVal').innerText = this.value">
+                </div>
+            </details>
+
+            <!-- GROUP: Smoothing & Preproc -->
+            <details class="group border-b border-gray-700">
+                <summary class="flex justify-between items-center font-semibold cursor-pointer p-4 hover:bg-gray-700 bg-gray-800/50">
+                    Pre-processing (Blur)
+                    <span class="transition group-open:rotate-180"><svg fill="none" height="24" stroke="currentColor" viewBox="0 0 24 24" width="24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></span>
+                </summary>
+                <div class="p-4 pt-0 space-y-4">
+                    <div class="flex justify-between"><label class="text-sm">Blur Radius</label><span id="bRadVal" class="text-sm text-blue-400">0</span></div>
+                    <input type="range" name="blurradius" min="0" max="5" value="0" class="w-full" oninput="document.getElementById('bRadVal').innerText = this.value">
+                    <div class="flex justify-between"><label class="text-sm">Blur Delta</label><span id="bDelVal" class="text-sm text-blue-400">20</span></div>
+                    <input type="range" name="blurdelta" min="0" max="255" value="20" class="w-full" oninput="document.getElementById('bDelVal').innerText = this.value">
+                </div>
+            </details>
+
+            <!-- GROUP: Path Simplification -->
+            <details class="group border-b border-gray-700">
+                <summary class="flex justify-between items-center font-semibold cursor-pointer p-4 hover:bg-gray-700 bg-gray-800/50">
+                    Simplification (DP & Advanced)
+                    <span class="transition group-open:rotate-180"><svg fill="none" height="24" stroke="currentColor" viewBox="0 0 24 24" width="24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></span>
+                </summary>
+                <div class="p-4 pt-0 space-y-4">
+                    <label class="flex items-center space-x-2"><input type="checkbox" name="douglas" value="true" checked class="form-checkbox h-4 w-4 text-blue-600 rounded"><span class="text-sm text-blue-300">Douglas-Peucker</span></label>
+                    <div class="flex justify-between"><label class="text-xs text-gray-400">Tolerance</label><span id="dpTolVal" class="text-xs text-blue-400">0.5</span></div>
+                    <input type="range" name="douglas_tolerance" min="0.1" max="5.0" step="0.1" value="0.5" class="w-full" oninput="document.getElementById('dpTolVal').innerText = this.value">
+                    <label class="flex items-center space-x-2"><input type="checkbox" name="douglas_curves" value="true" class="form-checkbox h-4 w-4 text-blue-600 rounded"><span class="text-sm">Protect Curves</span></label>
+                    
+                    <hr class="border-gray-600 my-2">
+                    
+                    <label class="flex items-center space-x-2"><input type="checkbox" name="vw_enable" value="true" class="form-checkbox h-4 w-4 text-blue-600 rounded"><span class="text-sm text-blue-300">Visvalingam-Whyatt</span></label>
+                    <div class="flex justify-between"><label class="text-xs text-gray-400">Area Tolerance</label><span id="vwTolVal" class="text-xs text-blue-400">1.0</span></div>
+                    <input type="range" name="vw_tolerance" min="0.1" max="10.0" step="0.1" value="1.0" class="w-full" oninput="document.getElementById('vwTolVal').innerText = this.value">
+                    
+                    <hr class="border-gray-600 my-2">
+
+                    <label class="flex items-center space-x-2"><input type="checkbox" name="aggressive_simplify" value="true" class="form-checkbox h-4 w-4 text-blue-600 rounded"><span class="text-sm">Aggressive Simplify</span></label>
+                    <div class="flex justify-between"><label class="text-xs text-gray-400">Collinear Tolerance</label><span id="colTolVal" class="text-xs text-blue-400">1.0</span></div>
+                    <input type="range" name="collinear_tolerance" min="0" max="5" step="0.1" value="1.0" class="w-full" oninput="document.getElementById('colTolVal').innerText = this.value">
+                    <div class="flex justify-between"><label class="text-xs text-gray-400">Min Segment Length</label><span id="mslVal" class="text-xs text-blue-400">2.0</span></div>
+                    <input type="range" name="min_segment_length" min="0" max="10" step="0.5" value="2.0" class="w-full" oninput="document.getElementById('mslVal').innerText = this.value">
+                    <div class="flex justify-between"><label class="text-xs text-gray-400">Curve Smoothing</label><span id="csmVal" class="text-xs text-blue-400">0.0</span></div>
+                    <input type="range" name="curve_smoothing" min="0" max="5" step="0.5" value="0.0" class="w-full" oninput="document.getElementById('csmVal').innerText = this.value">
+                </div>
+            </details>
+
+            <!-- GROUP: Gradients -->
+            <details class="group border-b border-gray-700">
+                <summary class="flex justify-between items-center font-semibold cursor-pointer p-4 hover:bg-gray-700 bg-gray-800/50">
+                    Gradient Detection
+                    <span class="transition group-open:rotate-180"><svg fill="none" height="24" stroke="currentColor" viewBox="0 0 24 24" width="24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></span>
+                </summary>
+                <div class="p-4 pt-0 space-y-4">
+                    <label class="flex items-center space-x-2"><input type="checkbox" name="detect_gradients" value="true" class="form-checkbox h-4 w-4 text-blue-600 rounded"><span class="text-sm">Enable Gradients</span></label>
+                    <div class="flex justify-between"><label class="text-sm">Min R^2 (Luma)</label><span id="gr2Val" class="text-sm text-blue-400">0.6</span></div>
+                    <input type="range" name="grad_r2" min="0.1" max="1.0" step="0.05" value="0.6" class="w-full" oninput="document.getElementById('gr2Val').innerText = this.value">
+                    <div class="flex justify-between"><label class="text-sm">Min RGB Delta</label><span id="gdelVal" class="text-sm text-blue-400">18</span></div>
+                    <input type="range" name="grad_delta" min="0" max="100" value="18" class="w-full" oninput="document.getElementById('gdelVal').innerText = this.value">
+                    <div class="flex justify-between"><label class="text-sm">Stride (Speed)</label><span id="gstrVal" class="text-sm text-blue-400">2</span></div>
+                    <input type="range" name="grad_stride" min="1" max="10" value="2" class="w-full" oninput="document.getElementById('gstrVal').innerText = this.value">
+                </div>
+            </details>
+
+            <!-- GROUP: Geometry & Filtering -->
+            <details class="group border-b border-gray-700">
+                <summary class="flex justify-between items-center font-semibold cursor-pointer p-4 hover:bg-gray-700 bg-gray-800/50">
+                    Geometry & Filtering
+                    <span class="transition group-open:rotate-180"><svg fill="none" height="24" stroke="currentColor" viewBox="0 0 24 24" width="24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg></span>
+                </summary>
+                <div class="p-4 pt-0 space-y-4">
+                    <label class="flex items-center space-x-2"><input type="checkbox" name="detect_geometry" value="true" class="form-checkbox h-4 w-4 text-blue-600 rounded"><span class="text-sm">Detect Shapes (Circles)</span></label>
+                    <div class="flex justify-between"><label class="text-xs text-gray-400">Line Tol</label><span id="ltoVal" class="text-xs text-blue-400">2.0</span></div>
+                    <input type="range" name="line_tolerance" min="0.1" max="10" step="0.1" value="2.0" class="w-full" oninput="document.getElementById('ltoVal').innerText = this.value">
+                    <div class="flex justify-between"><label class="text-xs text-gray-400">Circle Tol</label><span id="ctoVal" class="text-xs text-blue-400">5.0</span></div>
+                    <input type="range" name="circle_tolerance" min="0.1" max="10" step="0.1" value="5.0" class="w-full" oninput="document.getElementById('ctoVal').innerText = this.value">
+                    
+                    <hr class="border-gray-600 my-2">
+                    
+                    <label class="flex items-center space-x-2"><input type="checkbox" name="filter_small" value="true" checked class="form-checkbox h-4 w-4 text-blue-600 rounded"><span class="text-sm">Filter Small Objects</span></label>
+                    <div class="flex justify-between"><label class="text-xs text-gray-400">Min Area</label><span id="maVal" class="text-xs text-blue-400">10</span></div>
+                    <input type="range" name="min_area" min="0" max="100" value="10" class="w-full" oninput="document.getElementById('maVal').innerText = this.value">
+                    <div class="flex justify-between"><label class="text-xs text-gray-400">Min Perimeter</label><span id="mpVal" class="text-xs text-blue-400">12</span></div>
+                    <input type="range" name="min_perimeter" min="0" max="100" value="12" class="w-full" oninput="document.getElementById('mpVal').innerText = this.value">
+                </div>
+            </details>
+        </form>
+    </div>
+
+    <div class="flex-1 flex flex-col relative bg-gray-950 checkerboard border-r border-gray-700">
+        <div class="h-12 border-b border-gray-700 bg-gray-800/80 backdrop-blur flex items-center justify-between px-4 z-20 absolute top-0 w-full pointer-events-none">
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-gray-400 font-semibold" id="statusText">Hold <span class="bg-gray-700 text-white px-2 py-0.5 rounded text-xs border border-gray-600 shadow">Right Click</span> to view original</span>
+            </div>
+            <div class="pointer-events-auto flex items-center">
+                <button id="resetViewBtn" class="bg-gray-700 hover:bg-gray-600 text-white text-xs py-1 px-3 rounded hidden transition">Fit to Screen</button>
+            </div>
+        </div>
+
+        <div id="viewport" class="w-full h-full relative overflow-hidden cursor-grab">
+            
+            <div id="emptyState" class="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
+                <div id="dropZoneBox" class="bg-gray-800/90 backdrop-blur-md border-2 border-dashed border-gray-600 rounded-3xl p-12 flex flex-col items-center shadow-2xl transition-all pointer-events-auto cursor-pointer hover:bg-gray-700 hover:border-blue-500">
+                    <svg class="h-16 w-16 mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    <p class="text-gray-200 font-semibold text-xl">Drag & Drop an image here</p>
+                    <p class="text-gray-500 text-sm mt-2">or click to browse</p>
+                </div>
+            </div>
+
+            <div id="canvas" class="absolute top-0 left-0 hidden origin-top-left shadow-2xl" style="transform: translate(0px, 0px) scale(1);">
+                <img id="originalImage" class="absolute top-0 left-0 w-full h-full object-fill z-10 pointer-events-none border border-transparent">
+                <div id="svgContent" class="absolute top-0 left-0 w-full h-full z-20 pointer-events-none hidden"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="w-[300px] min-w-[300px] bg-gray-800 flex flex-col h-full shadow-xl z-20 overflow-y-auto">
+        <div class="p-4 border-b border-gray-700 bg-gray-800 sticky top-0 z-20 shadow">
+            <h2 class="text-lg font-bold text-gray-200 flex items-center">
+                <svg class="w-5 h-5 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                File Information
+            </h2>
+        </div>
+        
+        <div class="p-4 space-y-8 flex-1 text-sm">
+            <div>
+                <h3 class="text-blue-400 font-semibold mb-3 uppercase tracking-wider text-xs">Original Bitmap</h3>
+                <div class="space-y-3 text-gray-400">
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">Name</span>
+                        <span id="infoOrigName" class="truncate ml-4 max-w-[150px] text-gray-300">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">Format</span>
+                        <span id="infoOrigFormat" class="text-gray-300">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">Resolution</span>
+                        <span id="infoOrigRes" class="text-gray-300">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">File Size</span>
+                        <span id="infoOrigSize" class="text-gray-300">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3 class="text-blue-400 font-semibold mb-3 uppercase tracking-wider text-xs">Vector Result</h3>
+                <div class="space-y-3 text-gray-400">
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">SVG Size</span>
+                        <span id="infoSvgSize" class="text-gray-300 font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500" title="Ratio of SVG size to original PNG/JPG size">Size Ratio</span>
+                        <span id="infoSvgRatio" class="text-gray-300 font-bold">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">Total Paths</span>
+                        <span id="infoSvgPaths" class="text-gray-300 font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500" title="Approximate number of Bezier & Line commands">Total Nodes</span>
+                        <span id="infoSvgNodes" class="text-gray-300 font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">Gradients</span>
+                        <span id="infoSvgGrads" class="text-gray-300 font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">Process Time</span>
+                        <span id="infoSvgTime" class="text-gray-300 font-mono">-</span>
+                    </div>
+                </div>
+                
+                <button id="downloadBtn" class="mt-6 w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow transition flex justify-center items-center hidden">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Download SVG
+                </button>
+            </div>
+            
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('vectorizeForm');
+        const formInputs = form.querySelectorAll('input[name], select[name]');
+        const processBtn = document.getElementById('processBtn');
+        const spinner = document.getElementById('loadingSpinner');
+        const fileInput = document.getElementById('imageInput');
+        
+        const viewport = document.getElementById('viewport');
+        const canvas = document.getElementById('canvas');
+        const originalImage = document.getElementById('originalImage');
+        const svgContent = document.getElementById('svgContent');
+        const emptyState = document.getElementById('emptyState');
+        const dropZoneBox = document.getElementById('dropZoneBox');
+        
+        const downloadBtn = document.getElementById('downloadBtn');
+        const resetViewBtn = document.getElementById('resetViewBtn');
+        
+        let currentSvgData = null;
+        let originalFileSize = 0;
+
+        // ==========================================
+        // PRESET MANAGEMENT
+        // ==========================================
+        const presetSelect = document.getElementById('presetSelect');
+        const btnSavePreset = document.getElementById('btnSavePreset');
+        const btnDeletePreset = document.getElementById('btnDeletePreset');
+        const btnResetPreset = document.getElementById('btnResetPreset');
+        
+        const PRESETS_KEY = 'img2svg_presets';
+        let defaultPreset = {}; // Сохраним дефолт при загрузке страницы
+
+        function getCurrentSettings() {
+            const s = {};
+            formInputs.forEach(i => {
+                s[i.name] = (i.type === 'checkbox') ? i.checked : i.value;
+            });
+            return s;
+        }
+
+        function applySettings(s) {
+            formInputs.forEach(i => {
+                if(s[i.name] !== undefined) {
+                    if(i.type === 'checkbox') i.checked = s[i.name];
+                    else i.value = s[i.name];
+                    // Trigger oninput/onchange to update UI labels
+                    i.dispatchEvent(new Event('input', { bubbles: true }));
+                }
+            });
+        }
+
+        function loadPresetsFromStorage() {
+            let stored = localStorage.getItem(PRESETS_KEY);
+            return stored ? JSON.parse(stored) : {};
+        }
+
+        function savePresetsToStorage(presets) {
+            localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+        }
+
+        function updatePresetSelect() {
+            const presets = loadPresetsFromStorage();
+            const currentVal = presetSelect.value;
+            
+            presetSelect.innerHTML = '<option value="default">Default Settings</option>';
+            for(let key in presets) {
+                const opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = key;
+                presetSelect.appendChild(opt);
+            }
+            
+            if (currentVal === 'default' || presets[currentVal]) {
+                presetSelect.value = currentVal;
+            } else {
+                presetSelect.value = 'default';
+            }
+            updatePresetButtons();
+        }
+
+        function updatePresetButtons() {
+            const isDefault = presetSelect.value === 'default';
+            btnDeletePreset.disabled = isDefault;
+        }
+
+        // Init Presets
+        document.addEventListener('DOMContentLoaded', () => {
+            defaultPreset = getCurrentSettings();
+            updatePresetSelect();
+        });
+
+        presetSelect.addEventListener('change', () => {
+            updatePresetButtons();
+            if(presetSelect.value === 'default') {
+                applySettings(defaultPreset);
+            } else {
+                const p = loadPresetsFromStorage()[presetSelect.value];
+                if(p) applySettings(p);
+            }
+        });
+
+        btnResetPreset.addEventListener('click', () => {
+            if(presetSelect.value === 'default') {
+                applySettings(defaultPreset);
+            } else {
+                const p = loadPresetsFromStorage()[presetSelect.value];
+                if(p) applySettings(p);
+            }
+        });
+
+        btnSavePreset.addEventListener('click', () => {
+            const currentName = presetSelect.value === 'default' ? 'My Preset 1' : presetSelect.value;
+            const name = prompt('Enter preset name:', currentName);
+            if (!name) return;
+            if (name.toLowerCase() === 'default') {
+                alert('Cannot overwrite "default" preset name.');
+                return;
+            }
+            
+            const p = loadPresetsFromStorage();
+            p[name] = getCurrentSettings();
+            savePresetsToStorage(p);
+            updatePresetSelect();
+            presetSelect.value = name;
+            updatePresetButtons();
+        });
+
+        btnDeletePreset.addEventListener('click', () => {
+            const name = presetSelect.value;
+            if (name === 'default') return;
+            if (confirm(`Are you sure you want to delete preset "${name}"?`)) {
+                const p = loadPresetsFromStorage();
+                delete p[name];
+                savePresetsToStorage(p);
+                presetSelect.value = 'default';
+                applySettings(defaultPreset);
+                updatePresetSelect();
+            }
+        });
+
+
+        // ==========================================
+        // UTILS
+        // ==========================================
+        function formatBytes(bytes, decimals = 2) {
+            if (!+bytes) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['B', 'KB', 'MB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+        }
+
+        // ==========================================
+        // PAN & ZOOM LOGIC
+        // ==========================================
+        let scale = 1;
+        let panX = 0;
+        let panY = 0;
+        let isDragging = false;
+        let startDragX = 0, startDragY = 0;
+
+        function updateTransform() {
+            canvas.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        }
+
+        function resetView() {
+            if(!originalImage.src) return;
+            const vp = viewport.getBoundingClientRect();
+            const iw = originalImage.naturalWidth;
+            const ih = originalImage.naturalHeight;
+            if(iw === 0) return;
+
+            const scaleX = (vp.width - 80) / iw;
+            const scaleY = (vp.height - 80) / ih;
+            scale = Math.min(scaleX, scaleY, 1);
+            
+            panX = (vp.width - (iw * scale)) / 2;
+            panY = (vp.height - (ih * scale)) / 2;
+            
+            updateTransform();
+        }
+
+        resetViewBtn.addEventListener('click', resetView);
+
+        viewport.addEventListener('wheel', (e) => {
+            if (canvas.classList.contains('hidden')) return;
+            e.preventDefault();
+
+            const zoomFactor = 1.15;
+            const delta = e.deltaY < 0 ? zoomFactor : (1 / zoomFactor);
+            
+            const rect = viewport.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            panX = mouseX - (mouseX - panX) * delta;
+            panY = mouseY - (mouseY - panY) * delta;
+            scale *= delta;
+
+            updateTransform();
+        });
+
+        viewport.addEventListener('mousedown', (e) => {
+            if (canvas.classList.contains('hidden')) return;
+            if (e.button === 0) { 
+                isDragging = true;
+                startDragX = e.clientX - panX;
+                startDragY = e.clientY - panY;
+                viewport.classList.remove('cursor-grab');
+                viewport.classList.add('cursor-grabbing');
+            } else if (e.button === 2) { 
+                if (currentSvgData) {
+                    originalImage.classList.remove('hidden');
+                    svgContent.classList.add('hidden');
+                }
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                panX = e.clientX - startDragX;
+                panY = e.clientY - startDragY;
+                updateTransform();
+            }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (e.button === 0 && isDragging) {
+                isDragging = false;
+                viewport.classList.remove('cursor-grabbing');
+                viewport.classList.add('cursor-grab');
+            } else if (e.button === 2) { 
+                if (currentSvgData) {
+                    originalImage.classList.add('hidden');
+                    svgContent.classList.remove('hidden');
+                }
+            }
+        });
+
+        viewport.addEventListener('contextmenu', e => e.preventDefault());
+
+        // ==========================================
+        // DRAG & DROP LOGIC
+        // ==========================================
+        dropZoneBox.addEventListener('click', () => fileInput.click());
+
+        viewport.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZoneBox.classList.add('border-blue-500', 'bg-gray-700/90');
+        });
+
+        viewport.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            dropZoneBox.classList.remove('border-blue-500', 'bg-gray-700/90');
+        });
+
+        viewport.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZoneBox.classList.remove('border-blue-500', 'bg-gray-700/90');
+            
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                const file = e.dataTransfer.files[0];
+                if (file.type.startsWith('image/')) {
+                    const dt = new DataTransfer();
+                    dt.items.add(file);
+                    fileInput.files = dt.files;
+                    fileInput.dispatchEvent(new Event('change'));
+                } else {
+                    alert('Please drop an image file.');
+                }
+            }
+        });
+
+
+        // ==========================================
+        // FILE LOADING & VECTORIZATION
+        // ==========================================
+        fileInput.addEventListener('change', () => {
+            const file = fileInput.files[0];
+            if (file) {
+                const url = URL.createObjectURL(file);
+                originalImage.src = url;
+                originalFileSize = file.size;
+
+                document.getElementById('infoOrigName').innerText = file.name;
+                document.getElementById('infoOrigName').title = file.name;
+                document.getElementById('infoOrigFormat').innerText = file.type || file.name.split('.').pop().toUpperCase();
+                document.getElementById('infoOrigSize').innerText = formatBytes(file.size);
+                
+                document.getElementById('infoSvgSize').innerText = '-';
+                document.getElementById('infoSvgRatio').innerText = '-';
+                document.getElementById('infoSvgPaths').innerText = '-';
+                document.getElementById('infoSvgNodes').innerText = '-';
+                document.getElementById('infoSvgGrads').innerText = '-';
+                document.getElementById('infoSvgTime').innerText = '-';
+                document.getElementById('infoSvgRatio').className = 'text-gray-300 font-bold';
+
+                originalImage.onload = () => {
+                    document.getElementById('infoOrigRes').innerText = `${originalImage.naturalWidth} x ${originalImage.naturalHeight} px`;
+
+                    canvas.style.width = originalImage.naturalWidth + 'px';
+                    canvas.style.height = originalImage.naturalHeight + 'px';
+                    
+                    canvas.classList.remove('hidden');
+                    emptyState.classList.add('hidden');
+                    processBtn.disabled = false;
+                    
+                    originalImage.classList.remove('hidden');
+                    svgContent.classList.add('hidden');
+                    svgContent.innerHTML = '';
+                    currentSvgData = null;
+                    
+                    resetView();
+                    resetViewBtn.classList.remove('hidden');
+                    downloadBtn.classList.add('hidden');
+                };
+            }
+        });
+
+        document.getElementById('processBtn').addEventListener('click', async () => {
+            if (!fileInput.files.length) return;
+
+            const formData = new FormData(form);
+            formData.append('image', fileInput.files[0]);
+
+            processBtn.disabled = true;
+            spinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/vectorize', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || data.details || 'Unknown error');
+                }
+
+                svgContent.innerHTML = data.svg;
+                currentSvgData = data.svg;
+                
+                const svgEl = svgContent.querySelector('svg');
+                if(svgEl) {
+                    svgEl.style.width = '100%';
+                    svgEl.style.height = '100%';
+                }
+
+                originalImage.classList.add('hidden');
+                svgContent.classList.remove('hidden');
+                downloadBtn.classList.remove('hidden');
+
+                // Анализ SVG
+                const svgBlob = new Blob([data.svg]);
+                document.getElementById('infoSvgSize').innerText = formatBytes(svgBlob.size);
+                
+                const ratio = ((svgBlob.size / originalFileSize) * 100).toFixed(1);
+                const ratioEl = document.getElementById('infoSvgRatio');
+                ratioEl.innerText = `${ratio}%`;
+                
+                if (ratio < 100) ratioEl.className = 'text-green-400 font-bold';
+                else if (ratio > 200) ratioEl.className = 'text-red-400 font-bold';
+                else ratioEl.className = 'text-yellow-400 font-bold';
+
+                document.getElementById('infoSvgTime').innerText = `${data.timeMs} ms`;
+
+                const paths = svgContent.querySelectorAll('path');
+                document.getElementById('infoSvgPaths').innerText = paths.length;
+                
+                let nodeCount = 0;
+                paths.forEach(p => {
+                    const d = p.getAttribute('d');
+                    if(d) {
+                        const matches = d.match(/[MLQZmlqz]/g);
+                        if (matches) nodeCount += matches.length;
+                    }
+                });
+                document.getElementById('infoSvgNodes').innerText = nodeCount;
+
+                const grads = svgContent.querySelectorAll('linearGradient, radialGradient');
+                document.getElementById('infoSvgGrads').innerText = grads.length;
+
+            } catch (err) {
+                alert('Vectorization Error: ' + err.message);
+            } finally {
+                processBtn.disabled = false;
+                spinner.classList.add('hidden');
+            }
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            if (!currentSvgData) return;
+            const blob = new Blob([currentSvgData], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'vectorized.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>

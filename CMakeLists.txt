@@ -39,6 +39,10 @@ cmake_dependent_option(BUILD_IMG2SVG
     "Build img2svg: Bitmap to SVG vectorizer"
     ON "BUILD_IMAGETRACER_LIB" OFF)
 
+cmake_dependent_option(BUILD_IMG2SVG_SERVER
+    "Build img2svg-server: Web application for bitmap to SVG vectorization."
+    ON "BUILD_IMAGETRACER_LIB" OFF)
+
 option(BUILD_IOM2HVIF "Build iom2hvif: Icon-O-Matic to HVIF converter (Haiku only)" OFF)
 
 option(BUILD_MSGDUMP "Build msgdump: BMessage dump utility (debug tool)" OFF)

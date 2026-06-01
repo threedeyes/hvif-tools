@@ -58,6 +58,30 @@ else()
 endif()
 
 # ============================================================================
+# HTTPLIB (required for img2svg web application)
+# ============================================================================
+
+set(HTTPLIB_DIR "${EXTERNAL_DIR}/cpp-httplib")
+if(NOT EXISTS "${HTTPLIB_DIR}/httplib.h")
+    if(BUILD_IMG2SVG_SERVER)
+        message(FATAL_ERROR 
+            "httplib is required for img2svg web application. "
+            "Please initialize submodules: git submodule update --init --recursive"
+        )
+    else()
+        message(WARNING "httplib not found, img2svg-server will not be available")
+        set(HTTPLIB_FOUND FALSE)
+    endif()
+else()
+    set(HTTPLIB_FOUND TRUE)
+    message(STATUS "Found httplib: ${HTTPLIB_DIR}")
+    
+    add_library(httplib INTERFACE)
+    target_include_directories(httplib INTERFACE ${HTTPLIB_DIR})
+endif()
+
+
+# ============================================================================
 # Haiku dependencies (iom2hvif)
 # ============================================================================
 
@@ -100,7 +124,14 @@ if(BUILD_IMAGETRACER_LIB AND NOT STB_FOUND)
     message(WARNING "Disabling libimagetracer due to missing STB")
     set(BUILD_IMAGETRACER_LIB OFF CACHE BOOL "" FORCE)
     set(BUILD_IMG2SVG OFF CACHE BOOL "" FORCE)
+    set(BUILD_IMG2SVG_SERVER OFF CACHE BOOL "" FORCE)
 endif()
+
+if(BUILD_IMG2SVG_SERVER AND NOT HTTPLIB_FOUND)
+    message(WARNING "Disabling img2svg-server due to missing httplib")
+    set(BUILD_IMG2SVG_SERVER OFF CACHE BOOL "" FORCE)
+endif()
+
 
 if(BUILD_IOM2HVIF AND HAIKU AND NOT AGG_FOUND)
     message(WARNING "Disabling iom2hvif due to missing libagg")
