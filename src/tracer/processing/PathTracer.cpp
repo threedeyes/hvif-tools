@@ -82,19 +82,39 @@ PathTracer::_FitSequence(const std::vector<std::vector<double> >& path,
 	}
     }
 
+    // Calculate chord-length parameterization 'u' for non-uniform points
+    int numPoints = sequenceEnd - sequenceStart;
+    std::vector<double> u(numPoints, 0.0);
+    double totalChordLength = 0.0;
+
+    for (int i = 1; i < numPoints; i++) {
+	double dx = path[sequenceStart + i][0] - path[sequenceStart + i - 1][0];
+	double dy = path[sequenceStart + i][1] - path[sequenceStart + i - 1][1];
+	totalChordLength += std::sqrt(dx*dx + dy*dy);
+	u[i] = totalChordLength;
+    }
+
+    if (totalChordLength > 1e-6) {
+	for (int i = 1; i < numPoints; i++) u[i] /= totalChordLength;
+    } else {
+	for (int i = 1; i < numPoints; i++) u[i] = static_cast<double>(i) / (numPoints - 1);
+    }
+
     int errorPoint = sequenceStart;
     bool curvePass = true;
     double pointX, pointY, distance2, errorValue = 0;
-    double totalLength = static_cast<double>(sequenceEnd - sequenceStart);
-    double velocityX = (path[(sequenceEnd - 1) % pathLength][0] - path[sequenceStart][0]) / totalLength;
-    double velocityY = (path[(sequenceEnd - 1) % pathLength][1] - path[sequenceStart][1]) / totalLength;
+
+    double dxLine = path[sequenceEnd - 1][0] - path[sequenceStart][0];
+    double dyLine = path[sequenceEnd - 1][1] - path[sequenceStart][1];
 
     for (int pointIndex = sequenceStart + 1; pointIndex < sequenceEnd - 1; pointIndex++) {
-	double pointLength = pointIndex - sequenceStart;
-	pointX = path[sequenceStart][0] + (velocityX * pointLength);
-	pointY = path[sequenceStart][1] + (velocityY * pointLength);
+	double t = u[pointIndex - sequenceStart];
+	pointX = path[sequenceStart][0] + dxLine * t;
+	pointY = path[sequenceStart][1] + dyLine * t;
+
 	distance2 = ((path[pointIndex][0] - pointX) * (path[pointIndex][0] - pointX)) +
 		   ((path[pointIndex][1] - pointY) * (path[pointIndex][1] - pointY));
+
 	if (distance2 > lineThreshold) {
 	    curvePass = false;
 	}
@@ -137,32 +157,50 @@ PathTracer::_FitSequence(const std::vector<std::vector<double> >& path,
 	return segment;
     }
 
-    int fitPoint = errorPoint;
+    // Least Squares fitting for quadratic bezier
+    double sumA2 = 0.0;
+    double sumABx = 0.0;
+    double sumABy = 0.0;
+
+    for (int pointIndex = sequenceStart + 1; pointIndex < sequenceEnd - 1; pointIndex++) {
+	double t = u[pointIndex - sequenceStart];
+	double t1 = (1.0 - t) * (1.0 - t);
+	double t2 = 2.0 * (1.0 - t) * t;
+	double t3 = t * t;
+
+	double Bx = path[pointIndex][0] - (t1 * path[sequenceStart][0] + t3 * path[sequenceEnd - 1][0]);
+	double By = path[pointIndex][1] - (t1 * path[sequenceStart][1] + t3 * path[sequenceEnd - 1][1]);
+
+	sumA2 += t2 * t2;
+	sumABx += t2 * Bx;
+	sumABy += t2 * By;
+    }
+
+    double controlPointX = 0.0;
+    double controlPointY = 0.0;
+
+    if (sumA2 > 1e-9) {
+	controlPointX = sumABx / sumA2;
+	controlPointY = sumABy / sumA2;
+    } else {
+	double tE = u[errorPoint - sequenceStart];
+	if (tE < 1e-3 || tE > 0.999) tE = 0.5;
+	double tE1 = (1.0 - tE) * (1.0 - tE);
+	double tE2 = 2.0 * (1.0 - tE) * tE;
+	double tE3 = tE * tE;
+	controlPointX = (path[errorPoint][0] - (tE1 * path[sequenceStart][0] + tE3 * path[sequenceEnd - 1][0])) / tE2;
+	controlPointY = (path[errorPoint][1] - (tE1 * path[sequenceStart][1] + tE3 * path[sequenceEnd - 1][1])) / tE2;
+    }
+
     curvePass = true;
     errorValue = 0;
 
-    double t = static_cast<double>(fitPoint - sequenceStart) / totalLength;
-    double t1 = (1.0 - t) * (1.0 - t);
-    double t2 = 2.0 * (1.0 - t) * t;
-    double t3 = t * t;
-
-    if (std::fabs(t2) < 0.001) {
-	int midPoint = (sequenceStart + sequenceEnd) / 2;
-	std::vector<std::vector<double> > result1 = _FitSequence(path, lineThreshold, quadraticThreshold, sequenceStart, midPoint + 1, depth + 1, registry);
-	std::vector<std::vector<double> > result2 = _FitSequence(path, lineThreshold, quadraticThreshold, midPoint, sequenceEnd, depth + 1, registry);
-	segment.insert(segment.end(), result1.begin(), result1.end());
-	segment.insert(segment.end(), result2.begin(), result2.end());
-	return segment;
-    }
-
-    double controlPointX = (((t1 * path[sequenceStart][0]) + (t3 * path[sequenceEnd - 1][0])) - path[fitPoint][0]) / (-t2);
-    double controlPointY = (((t1 * path[sequenceStart][1]) + (t3 * path[sequenceEnd - 1][1])) - path[fitPoint][1]) / (-t2);
-
     for (int pointIndex = sequenceStart + 1; pointIndex < sequenceEnd - 1; pointIndex++) {
-	t = static_cast<double>(pointIndex - sequenceStart) / totalLength;
-	t1 = (1.0 - t) * (1.0 - t);
-	t2 = 2.0 * (1.0 - t) * t;
-	t3 = t * t;
+	double t = u[pointIndex - sequenceStart];
+	double t1 = (1.0 - t) * (1.0 - t);
+	double t2 = 2.0 * (1.0 - t) * t;
+	double t3 = t * t;
+	
 	pointX = (t1 * path[sequenceStart][0]) + (t2 * controlPointX) + (t3 * path[sequenceEnd - 1][0]);
 	pointY = (t1 * path[sequenceStart][1]) + (t2 * controlPointY) + (t3 * path[sequenceEnd - 1][1]);
 

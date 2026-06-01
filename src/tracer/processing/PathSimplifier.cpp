@@ -10,6 +10,7 @@
 #include "PathSimplifier.h"
 #include "PathTracer.h"
 #include "SharedEdgeRegistry.h"
+#include "VisvalingamWhyatt.h"
 
 PathSimplifier::PathSimplifier()
 {
@@ -206,12 +207,9 @@ PathSimplifier::BatchSimplifyPoints(
 		}
 	    }
 
-	    if (options.fDouglasPeuckerEnabled) {
-		path = DouglasPeuckerWithProtection(path, dpTol, prot);
-	    }
-	    
 	    if (options.fCurveSmoothing > 0) {
-		for (int iter = 0; iter < static_cast<int>(options.fCurveSmoothing * 3); iter++) {
+		int smoothPasses = static_cast<int>(options.fCurveSmoothing * 3);
+		for (int iter = 0; iter < smoothPasses; iter++) {
 		    std::vector<std::vector<double> > sm = path;
 		    for (size_t p = 1; p < path.size() - 1; p++) {
 			if (!prot[p]) {
@@ -222,6 +220,34 @@ PathSimplifier::BatchSimplifyPoints(
 		    path = sm;
 		}
 	    }
+
+	    if (options.fVisvalingamWhyattEnabled) {
+		VisvalingamWhyatt vw;
+		path = vw.SimplifyPath(path, options.fVisvalingamWhyattTolerance, &prot);
+
+		prot.assign(path.size(), false);
+		prot[0] = true;
+		prot.back() = true;
+		if (registry) {
+		    for (size_t p = 0; p < path.size(); p++) {
+			if (registry->IsJunction(path[p][0], path[p][1])) prot[p] = true;
+		    }
+		}
+	    }
+
+	    if (options.fDouglasPeuckerEnabled) {
+		bool dpCurveProtection = (options.fDouglasPeuckerCurveProtection > 0.5f);
+		float dpCurvatureThreshold = 0.1f + (options.fDouglasPeuckerCurveProtection * 0.9f);
+		if (dpCurveProtection) {
+		    for (size_t p = 1; p < path.size() - 1; p++) {
+			if (_CalculateCurvature(path[p-1], path[p], path[p+1]) > dpCurvatureThreshold) {
+			    prot[p] = true;
+			}
+		    }
+		}
+		path = DouglasPeuckerWithProtection(path, dpTol, prot);
+	    }
+
 	    layerPaths.push_back(path);
 	}
 	simplifiedLayers.push_back(layerPaths);
