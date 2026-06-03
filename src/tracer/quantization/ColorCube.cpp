@@ -101,45 +101,6 @@ void
 ColorCube::AssignColors()
 {
 	fColormap.resize(fColors);
-
 	fColors = 0;
 	fRoot->CreateColormap();
-
-	int height = fPixels.size();
-	int width = fPixels[0].size();
-
-	ColorSearchResult search;
-
-	for (int y = 0; y < height; y++) {
-		for (int x = 0; x < width; x++) {
-			int pixel = fPixels[y][x];
-
-			if (pixel == fSkipValue)
-				continue;
-
-			int red   = (pixel >> 16) & 0xFF;
-			int green = (pixel >> 8) & 0xFF;
-			int blue  = pixel & 0xFF;
-			int alpha = (pixel >> 24) & 0xFF;
-
-			if (MathUtils::IsTransparent((unsigned char)alpha))
-				continue;
-
-			ColorNode* node = fRoot;
-			for (;;) {
-				int id = (((red > node->GetMidRed() ? 1 : 0) << 0) |
-						 ((green > node->GetMidGreen() ? 1 : 0) << 1) |
-						 ((blue > node->GetMidBlue() ? 1 : 0) << 2) |
-						 ((alpha > node->GetMidAlpha() ? 1 : 0) << 3));
-
-				if (!node->GetChild(id))
-					break;
-
-				node = node->GetChild(id);
-			}
-
-			search.distance = MathUtils::MAX_DISTANCE;
-			node->GetParent()->FindClosestColor(red, green, blue, alpha, search);
-		}
-	}
 }
