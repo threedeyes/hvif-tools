@@ -85,6 +85,8 @@ ColorNode::PruneChild()
 	--fCube->fNodes;
 	fCube = NULL;
 	fParent = NULL;
+
+	delete this;
 }
 
 void
