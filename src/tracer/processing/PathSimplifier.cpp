@@ -197,6 +197,7 @@ PathSimplifier::BatchSimplifyPoints(
 		continue;
 	    }
 
+	    // 1. Build initial protection map (topology junctions)
 	    std::vector<bool> prot(path.size(), false);
 	    prot[0] = true;
 	    prot.back() = true;
@@ -207,6 +208,72 @@ PathSimplifier::BatchSimplifyPoints(
 		}
 	    }
 
+	    // 2. Safe Min Segment Length (respects protected junctions)
+	    if (options.fMinSegmentLength > 0) {
+		std::vector<std::vector<double> > tempPath;
+		std::vector<bool> tempProt;
+		tempPath.push_back(path[0]);
+		tempProt.push_back(prot[0]);
+
+		for (size_t p = 1; p < path.size(); p++) {
+		    const std::vector<double>& prev = tempPath.back();
+		    const std::vector<double>& curr = path[p];
+		    double dx = curr[0] - prev[0];
+		    double dy = curr[1] - prev[1];
+		    double dist = std::sqrt(dx * dx + dy * dy);
+
+		    // Keep point if distance > min, OR if protected, OR last point
+		    if (dist >= options.fMinSegmentLength || prot[p] || p == path.size() - 1) {
+			tempPath.push_back(curr);
+			tempProt.push_back(prot[p]);
+		    }
+		}
+		path = tempPath;
+		prot = tempProt;
+	    }
+
+	    // 3. Safe Collinear Tolerance (respects protected junctions)
+	    if (options.fCollinearTolerance > 0 && path.size() >= 3) {
+		std::vector<std::vector<double> > tempPath;
+		std::vector<bool> tempProt;
+		tempPath.push_back(path[0]);
+		tempProt.push_back(prot[0]);
+
+		for (size_t p = 1; p < path.size() - 1; p++) {
+		    if (prot[p]) {
+			tempPath.push_back(path[p]);
+			tempProt.push_back(prot[p]);
+			continue;
+		    }
+
+		    const std::vector<double>& prev = tempPath.back();
+		    const std::vector<double>& curr = path[p];
+		    const std::vector<double>& next = path[p + 1];
+
+		    double area = std::fabs((curr[0] - prev[0]) * (next[1] - prev[1]) -
+					    (next[0] - prev[0]) * (curr[1] - prev[1]));
+		    double baseLength = std::sqrt((next[0] - prev[0]) * (next[0] - prev[0]) +
+						  (next[1] - prev[1]) * (next[1] - prev[1]));
+
+		    if (area / std::max(baseLength, 1.0) > options.fCollinearTolerance) {
+			tempPath.push_back(curr);
+			tempProt.push_back(prot[p]);
+		    }
+		}
+		
+		tempPath.push_back(path.back());
+		tempProt.push_back(prot.back());
+
+		path = tempPath;
+		prot = tempProt;
+	    }
+
+	    if (path.size() < 3) {
+		layerPaths.push_back(path);
+		continue;
+	    }
+
+	    // 4. Curve Smoothing
 	    if (options.fCurveSmoothing > 0) {
 		int smoothPasses = static_cast<int>(options.fCurveSmoothing * 3);
 		for (int iter = 0; iter < smoothPasses; iter++) {
@@ -221,10 +288,19 @@ PathSimplifier::BatchSimplifyPoints(
 		}
 	    }
 
+	    // 5. Visvalingam-Whyatt
 	    if (options.fVisvalingamWhyattEnabled) {
-		VisvalingamWhyatt vw;
-		path = vw.SimplifyPath(path, options.fVisvalingamWhyattTolerance, &prot);
+		std::vector<bool> vwProt = prot;
+		for (size_t p = 1; p < path.size() - 1; p++) {
+		    if (_CalculateCurvature(path[p-1], path[p], path[p+1]) > 0.5f) {
+			vwProt[p] = true;
+		    }
+		}
 
+		VisvalingamWhyatt vw;
+		path = vw.SimplifyPath(path, options.fVisvalingamWhyattTolerance, &vwProt);
+
+		// Rebuild protection map after VW removed points
 		prot.assign(path.size(), false);
 		prot[0] = true;
 		prot.back() = true;
@@ -235,6 +311,7 @@ PathSimplifier::BatchSimplifyPoints(
 		}
 	    }
 
+	    // 6. Douglas-Peucker
 	    if (options.fDouglasPeuckerEnabled) {
 		bool dpCurveProtection = (options.fDouglasPeuckerCurveProtection > 0.5f);
 		float dpCurvatureThreshold = 0.1f + (options.fDouglasPeuckerCurveProtection * 0.9f);
