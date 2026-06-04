@@ -1,5 +1,5 @@
 /*
- * Copyright 2025, Gerasim Troeglazov, 3dEyes@gmail.com. All rights reserved.
+ * Copyright 2025-2026, Gerasim Troeglazov, 3dEyes@gmail.com. All rights reserved.
  * Distributed under the terms of the MIT License.
  */
 
@@ -13,10 +13,11 @@
 #include "ColorCube.h"
 #include "SelectiveBlur.h"
 #include "MathUtils.h"
+#include "ParallelUtils.h"
 
 ColorQuantizer::ColorQuantizer()
 {
-	MathUtils::Init();
+    MathUtils::Init();
 }
 
 ColorQuantizer::~ColorQuantizer()
@@ -26,64 +27,64 @@ ColorQuantizer::~ColorQuantizer()
 std::vector<int>
 ColorQuantizer::QuantizeImage(const std::vector<std::vector<int> >& pixels, int maxColors)
 {
-	MathUtils::Init();
+    MathUtils::Init();
 
-	ColorCube cube(pixels, maxColors);
-	cube.ClassifyColors();
-	cube.ReduceColors();
-	cube.AssignColors();
-	return cube.GetColormap();
+    ColorCube cube(pixels, maxColors);
+    cube.ClassifyColors();
+    cube.ReduceColors();
+    cube.AssignColors();
+    return cube.GetColormap();
 }
 
 std::vector<int>
 ColorQuantizer::QuantizeImageMasked(const std::vector<std::vector<int> >& pixels, int maxColors, int skipValue)
 {
-	MathUtils::Init();
+    MathUtils::Init();
 
-	ColorCube cube(pixels, maxColors, skipValue);
-	cube.ClassifyColors();
-	cube.ReduceColors();
-	cube.AssignColors();
-	return cube.GetColormap();
+    ColorCube cube(pixels, maxColors, skipValue);
+    cube.ClassifyColors();
+    cube.ReduceColors();
+    cube.AssignColors();
+    return cube.GetColormap();
 }
 
 double
 ColorQuantizer::_ComputeEdgeStrength(const BitmapData& bitmap, int cx, int cy)
 {
-	static const int sobelX[3][3] = {
-		{-1, 0, 1},
-		{-2, 0, 2},
-		{-1, 0, 1}
-	};
+    static const int sobelX[3][3] = {
+	{-1, 0, 1},
+	{-2, 0, 2},
+	{-1, 0, 1}
+    };
 
-	static const int sobelY[3][3] = {
-		{-1, -2, -1},
-		{ 0,  0,  0},
-		{ 1,  2,  1}
-	};
+    static const int sobelY[3][3] = {
+	{-1, -2, -1},
+	{ 0,  0,  0},
+	{ 1,  2,  1}
+    };
 
-	double gx = 0, gy = 0;
+    double gx = 0, gy = 0;
 
-	for (int dy = -1; dy <= 1; dy++) {
-		for (int dx = -1; dx <= 1; dx++) {
-			int x = cx + dx;
-			int y = cy + dy;
+    for (int dy = -1; dy <= 1; dy++) {
+	for (int dx = -1; dx <= 1; dx++) {
+	    int x = cx + dx;
+	    int y = cy + dy;
 
-			if (x < 0 || x >= bitmap.Width() || y < 0 || y >= bitmap.Height())
-				continue;
+	    if (x < 0 || x >= bitmap.Width() || y < 0 || y >= bitmap.Height())
+		continue;
 
-			int r = bitmap.GetPixelComponent(x, y, 0);
-			int g = bitmap.GetPixelComponent(x, y, 1);
-			int b = bitmap.GetPixelComponent(x, y, 2);
+	    int r = bitmap.GetPixelComponent(x, y, 0);
+	    int g = bitmap.GetPixelComponent(x, y, 1);
+	    int b = bitmap.GetPixelComponent(x, y, 2);
 
-			double luma = (r * 299 + g * 587 + b * 114) / 1000.0;
+	    double luma = (r * 299 + g * 587 + b * 114) / 1000.0;
 
-			gx += luma * sobelX[dy+1][dx+1];
-			gy += luma * sobelY[dy+1][dx+1];
-		}
+	    gx += luma * sobelX[dy+1][dx+1];
+	    gy += luma * sobelY[dy+1][dx+1];
 	}
+    }
 
-	return sqrt(gx*gx + gy*gy);
+    return sqrt(gx*gx + gy*gy);
 }
 
 void
@@ -159,7 +160,8 @@ ColorQuantizer::_AdaptiveSpatialCoherence(std::vector<std::vector<int> >& indexA
     if (paletteSize > 48) actualPasses += 1;
 
     for (int pass = 0; pass < actualPasses; pass++) {
-	for (int y = 1; y < height + 1; y++) {
+	// Parallelize spatial coherence over Y rows
+	ParallelUtils::ParallelFor(1, height + 1, [&](int y) {
 	    for (int x = 1; x < width + 1; x++) {
 		int centerIdx = indexArray[y][x];
 		if (centerIdx < 0)
@@ -191,7 +193,7 @@ ColorQuantizer::_AdaptiveSpatialCoherence(std::vector<std::vector<int> >& indexA
 		int mostFrequent = centerIdx;
 		int centerCount = 0;
 
-		for (std::map<int, int>::const_iterator it = histogram.begin();
+		for (std::map<int, int>::const_iterator it = histogram.begin(); 
 		     it != histogram.end(); ++it) {
 		    if (it->first == centerIdx) {
 			centerCount = it->second;
@@ -205,17 +207,14 @@ ColorQuantizer::_AdaptiveSpatialCoherence(std::vector<std::vector<int> >& indexA
 		double consensusRatio = (double)maxCount / (double)totalVotes;
 		double centerRatio = (double)centerCount / (double)totalVotes;
 
-		// Identify anti-aliasing slivers: color is minority, sits on boundary,
-		// and another color has a solid (but not overwhelming) lead
-		bool isAntiAliasingSliver = isColorBoundary[y][x] &&
-					    centerRatio < 0.30 &&
-					    consensusRatio >= 0.35 &&
-					    consensusRatio <= 0.70 &&
+		bool isAntiAliasingSliver = isColorBoundary[y][x] && 
+					    centerRatio < 0.30 && 
+					    consensusRatio >= 0.35 && 
+					    consensusRatio <= 0.70 && 
 					    mostFrequent != centerIdx;
 
 		bool isVeryStrongEdge = isColorBoundary[y][x] && edgeStrength[y][x] > edgeThreshold * 0.75;
 
-		// Protect extremely sharp borders, EXCEPT when they are anti-aliasing artifacts
 		if (isVeryStrongEdge && !isAntiAliasingSliver) {
 		    temp[y][x] = centerIdx;
 		    continue;
@@ -236,215 +235,217 @@ ColorQuantizer::_AdaptiveSpatialCoherence(std::vector<std::vector<int> >& indexA
 		    temp[y][x] = centerIdx;
 		}
 	    }
-	}
+	});
 
-	indexArray = temp;
+	// Fast O(1) swap instead of O(N) copy
+	std::swap(indexArray, temp);
     }
 }
 
 void
 ColorQuantizer::_RemapIndices(std::vector<std::vector<int> >& indexArray,
-							 const std::vector<int>& remapTable,
-							 int width, int height)
+			     const std::vector<int>& remapTable,
+			     int width, int height)
 {
-	for (int y = 1; y < height + 1; y++) {
-		for (int x = 1; x < width + 1; x++) {
-			int idx = indexArray[y][x];
-			if (idx >= 0 && idx < static_cast<int>(remapTable.size())) {
-				indexArray[y][x] = remapTable[idx];
-			}
-		}
+    for (int y = 1; y < height + 1; y++) {
+	for (int x = 1; x < width + 1; x++) {
+	    int idx = indexArray[y][x];
+	    if (idx >= 0 && idx < static_cast<int>(remapTable.size())) {
+		indexArray[y][x] = remapTable[idx];
+	    }
 	}
+    }
 }
 
 void
 ColorQuantizer::_MergeSimilarPaletteColors(std::vector<std::vector<unsigned char> >& palette,
-										  std::vector<std::vector<int> >& indexArray,
-										  int width, int height,
-										  int threshold)
+					  std::vector<std::vector<int> >& indexArray,
+					  int width, int height,
+					  int threshold)
 {
-	if (palette.size() < 2)
-		return;
+    if (palette.size() < 2)
+	return;
 
-	int originalPaletteSize = palette.size();
+    int originalPaletteSize = palette.size();
 
-	if (originalPaletteSize <= 12)
-		return;
+    if (originalPaletteSize <= 12)
+	return;
 
-	bool hasTransparentAtZero = (!palette.empty() && MathUtils::IsTransparent(palette[0][3]));
+    bool hasTransparentAtZero = (!palette.empty() && MathUtils::IsTransparent(palette[0][3]));
 
-	std::vector<int> usage(palette.size(), 0);
-	for (int y = 1; y < height + 1; y++) {
-		for (int x = 1; x < width + 1; x++) {
-			int idx = indexArray[y][x];
-			if (idx >= 0 && idx < static_cast<int>(palette.size())) {
-				usage[idx]++;
-			}
-		}
+    std::vector<int> usage(palette.size(), 0);
+    for (int y = 1; y < height + 1; y++) {
+	for (int x = 1; x < width + 1; x++) {
+	    int idx = indexArray[y][x];
+	    if (idx >= 0 && idx < static_cast<int>(palette.size())) {
+		usage[idx]++;
+	    }
 	}
+    }
 
-	std::vector<int> remapTable(palette.size());
-	for (int i = 0; i < static_cast<int>(palette.size()); i++) {
-		remapTable[i] = i;
+    std::vector<int> remapTable(palette.size());
+    for (int i = 0; i < static_cast<int>(palette.size()); i++) {
+	remapTable[i] = i;
+    }
+
+    std::vector<bool> merged(palette.size(), false);
+
+    if (hasTransparentAtZero) {
+	merged[0] = true;
+    }
+
+    double adaptiveThreshold = MathUtils::AdaptiveThreshold(originalPaletteSize, threshold);
+
+    int startIdx = hasTransparentAtZero ? 1 : 0;
+
+    for (int i = startIdx; i < static_cast<int>(palette.size()); i++) {
+	if (merged[i])
+	    continue;
+
+	if (MathUtils::IsTransparent(palette[i][3]))
+	    continue;
+
+	for (int j = i + 1; j < static_cast<int>(palette.size()); j++) {
+	    if (merged[j])
+		continue;
+
+	    if (MathUtils::IsTransparent(palette[j][3]))
+		continue;
+
+	    double dist = MathUtils::PerceptualColorDistanceForMerge(
+		palette[i][0], palette[i][1], palette[i][2], palette[i][3],
+		palette[j][0], palette[j][1], palette[j][2], palette[j][3]
+	    );
+
+	    if (dist < adaptiveThreshold) {
+		merged[j] = true;
+		remapTable[j] = i;
+	    }
 	}
+    }
 
-	std::vector<bool> merged(palette.size(), false);
-
-	if (hasTransparentAtZero) {
-		merged[0] = true;
+    for (int i = 0; i < static_cast<int>(remapTable.size()); i++) {
+	int target = i;
+	while (remapTable[target] != target) {
+	    target = remapTable[target];
 	}
+	remapTable[i] = target;
+    }
 
-	double adaptiveThreshold = MathUtils::AdaptiveThreshold(originalPaletteSize, threshold);
+    _RemapIndices(indexArray, remapTable, width, height);
 
-	int startIdx = hasTransparentAtZero ? 1 : 0;
+    std::vector<std::vector<unsigned char> > newPalette;
+    std::vector<int> finalRemap(palette.size(), -1);
 
-	for (int i = startIdx; i < static_cast<int>(palette.size()); i++) {
-		if (merged[i])
-			continue;
-
-		if (MathUtils::IsTransparent(palette[i][3]))
-			continue;
-
-		for (int j = i + 1; j < static_cast<int>(palette.size()); j++) {
-			if (merged[j])
-				continue;
-
-			if (MathUtils::IsTransparent(palette[j][3]))
-				continue;
-
-			double dist = MathUtils::PerceptualColorDistanceForMerge(
-				palette[i][0], palette[i][1], palette[i][2], palette[i][3],
-				palette[j][0], palette[j][1], palette[j][2], palette[j][3]
-			);
-
-			if (dist < adaptiveThreshold) {
-				merged[j] = true;
-				remapTable[j] = i;
-			}
-		}
+    for (int i = 0; i < static_cast<int>(palette.size()); i++) {
+	if (!merged[i] || (hasTransparentAtZero && i == 0)) {
+	    finalRemap[i] = newPalette.size();
+	    newPalette.push_back(palette[i]);
 	}
+    }
 
-	for (int i = 0; i < static_cast<int>(remapTable.size()); i++) {
-		int target = i;
-		while (remapTable[target] != target) {
-			target = remapTable[target];
-		}
-		remapTable[i] = target;
+    for (int i = 0; i < static_cast<int>(palette.size()); i++) {
+	if (merged[i] && !(hasTransparentAtZero && i == 0)) {
+	    finalRemap[i] = finalRemap[remapTable[i]];
 	}
+    }
 
-	_RemapIndices(indexArray, remapTable, width, height);
+    _RemapIndices(indexArray, finalRemap, width, height);
 
-	std::vector<std::vector<unsigned char> > newPalette;
-	std::vector<int> finalRemap(palette.size(), -1);
-
-	for (int i = 0; i < static_cast<int>(palette.size()); i++) {
-		if (!merged[i] || (hasTransparentAtZero && i == 0)) {
-			finalRemap[i] = newPalette.size();
-			newPalette.push_back(palette[i]);
-		}
-	}
-
-	for (int i = 0; i < static_cast<int>(palette.size()); i++) {
-		if (merged[i] && !(hasTransparentAtZero && i == 0)) {
-			finalRemap[i] = finalRemap[remapTable[i]];
-		}
-	}
-
-	_RemapIndices(indexArray, finalRemap, width, height);
-
-	palette = newPalette;
+    palette = newPalette;
 }
 
 IndexedBitmap
 ColorQuantizer::QuantizeColors(const BitmapData& bitmap,
-							const std::vector<std::vector<unsigned char> >& palette,
-							const TracingOptions& options)
+			    const std::vector<std::vector<unsigned char> >& palette,
+			    const TracingOptions& options)
 {
-	int paletteSize = static_cast<int>(palette.size());
+    int paletteSize = static_cast<int>(palette.size());
 
-	std::vector<std::vector<int> > indexArray(bitmap.Height() + 2);
-	for (int j = 0; j < bitmap.Height() + 2; j++) {
-		indexArray[j].resize(bitmap.Width() + 2, -1);
-	}
+    std::vector<std::vector<int> > indexArray(bitmap.Height() + 2);
+    for (int j = 0; j < bitmap.Height() + 2; j++) {
+	indexArray[j].resize(bitmap.Width() + 2, -1);
+    }
 
-	std::vector<std::vector<unsigned char> > workingPalette = palette;
+    std::vector<std::vector<unsigned char> > workingPalette = palette;
 
-	bool hasTransparentColor = false;
-	int transparentIndex = -1;
-	if (!palette.empty() && MathUtils::IsTransparent(palette[0][3])) {
-		hasTransparentColor = true;
-		transparentIndex = 0;
-	}
+    bool hasTransparentColor = false;
+    int transparentIndex = -1;
+    if (!palette.empty() && MathUtils::IsTransparent(palette[0][3])) {
+	hasTransparentColor = true;
+	transparentIndex = 0;
+    }
 
-	for (int y = 0; y < bitmap.Height(); y++) {
-		for (int x = 0; x < bitmap.Width(); x++) {
-			unsigned char red   = bitmap.GetPixelComponent(x, y, 0);
-			unsigned char green = bitmap.GetPixelComponent(x, y, 1);
-			unsigned char blue  = bitmap.GetPixelComponent(x, y, 2);
-			unsigned char alpha = bitmap.GetPixelComponent(x, y, 3);
+    // Parallelize initial pixel color mapping over Y rows
+    ParallelUtils::ParallelFor(0, bitmap.Height(), [&](int y) {
+	for (int x = 0; x < bitmap.Width(); x++) {
+	    unsigned char red   = bitmap.GetPixelComponent(x, y, 0);
+	    unsigned char green = bitmap.GetPixelComponent(x, y, 1);
+	    unsigned char blue  = bitmap.GetPixelComponent(x, y, 2);
+	    unsigned char alpha = bitmap.GetPixelComponent(x, y, 3);
 
-			if (MathUtils::IsTransparent(alpha)) {
-				if (hasTransparentColor) {
-					indexArray[y + 1][x + 1] = transparentIndex;
-				} else {
-					indexArray[y + 1][x + 1] = -1;
-				}
-				continue;
-			}
-
-			double closestDistance = MathUtils::MAX_DISTANCE;
-			int closestIndex = hasTransparentColor ? 1 : 0;
-
-			bool foundValidColor = false;
-
-			for (int k = (hasTransparentColor ? 1 : 0); k < static_cast<int>(workingPalette.size()); k++) {
-				unsigned char paletteAlpha = workingPalette[k][3];
-
-				if (MathUtils::IsTransparent(paletteAlpha))
-					continue;
-
-				double distance = MathUtils::PerceptualColorDistance(
-					red, green, blue, alpha,
-					workingPalette[k][0], workingPalette[k][1], workingPalette[k][2], workingPalette[k][3]
-				);
-
-				if (distance < closestDistance) {
-					closestDistance = distance;
-					closestIndex = k;
-					foundValidColor = true;
-				}
-			}
-
-			if (foundValidColor) {
-				indexArray[y + 1][x + 1] = closestIndex;
-			} else {
-				if (hasTransparentColor) {
-					indexArray[y + 1][x + 1] = transparentIndex;
-				} else {
-					indexArray[y + 1][x + 1] = -1;
-				}
-			}
+	    if (MathUtils::IsTransparent(alpha)) {
+		if (hasTransparentColor) {
+		    indexArray[y + 1][x + 1] = transparentIndex;
+		} else {
+		    indexArray[y + 1][x + 1] = -1;
 		}
-	}
+		continue;
+	    }
 
-	if (paletteSize > 16) {
-		double baseMergeThreshold = 18.0;
-		double adaptiveMerge = MathUtils::AdaptiveThreshold(paletteSize, baseMergeThreshold);
-		
-		_MergeSimilarPaletteColors(workingPalette, indexArray, 
-								  bitmap.Width(), 
-								  bitmap.Height(),
-								  (int)adaptiveMerge);
-	}
+	    double closestDistance = MathUtils::MAX_DISTANCE;
+	    int closestIndex = hasTransparentColor ? 1 : 0;
 
-	if (options.fSpatialCoherence && paletteSize > 12 && paletteSize <= 24) {
-		_AdaptiveSpatialCoherence(indexArray, 
-							bitmap,
-							bitmap.Width(), 
-							bitmap.Height(),
-							options.fSpatialCoherenceRadius,
-							options.fSpatialCoherencePasses);
-	}
+	    bool foundValidColor = false;
 
-	return IndexedBitmap(indexArray, workingPalette);
+	    for (int k = (hasTransparentColor ? 1 : 0); k < static_cast<int>(workingPalette.size()); k++) {
+		unsigned char paletteAlpha = workingPalette[k][3];
+
+		if (MathUtils::IsTransparent(paletteAlpha))
+		    continue;
+
+		double distance = MathUtils::PerceptualColorDistance(
+		    red, green, blue, alpha,
+		    workingPalette[k][0], workingPalette[k][1], workingPalette[k][2], workingPalette[k][3]
+		);
+
+		if (distance < closestDistance) {
+		    closestDistance = distance;
+		    closestIndex = k;
+		    foundValidColor = true;
+		}
+	    }
+
+	    if (foundValidColor) {
+		indexArray[y + 1][x + 1] = closestIndex;
+	    } else {
+		if (hasTransparentColor) {
+		    indexArray[y + 1][x + 1] = transparentIndex;
+		} else {
+		    indexArray[y + 1][x + 1] = -1;
+		}
+	    }
+	}
+    });
+
+    if (paletteSize > 16) {
+	double baseMergeThreshold = 18.0;
+	double adaptiveMerge = MathUtils::AdaptiveThreshold(paletteSize, baseMergeThreshold);
+	
+	_MergeSimilarPaletteColors(workingPalette, indexArray, 
+				  bitmap.Width(), 
+				  bitmap.Height(),
+				  (int)adaptiveMerge);
+    }
+
+    if (options.fSpatialCoherence && paletteSize > 12 && paletteSize <= 24) {
+	_AdaptiveSpatialCoherence(indexArray, 
+			    bitmap,
+			    bitmap.Width(), 
+			    bitmap.Height(),
+			    options.fSpatialCoherenceRadius,
+			    options.fSpatialCoherencePasses);
+    }
+
+    return IndexedBitmap(indexArray, workingPalette);
 }
