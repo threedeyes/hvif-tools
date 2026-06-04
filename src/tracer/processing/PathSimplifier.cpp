@@ -11,6 +11,7 @@
 #include "PathTracer.h"
 #include "SharedEdgeRegistry.h"
 #include "VisvalingamWhyatt.h"
+#include "ParallelUtils.h"
 
 PathSimplifier::PathSimplifier()
 {
@@ -183,12 +184,13 @@ PathSimplifier::BatchSimplifyPoints(
     const TracingOptions& options,
     const SharedEdgeRegistry* registry)
 {
-    std::vector<std::vector<std::vector<std::vector<double> > > > simplifiedLayers;
+    std::vector<std::vector<std::vector<std::vector<double> > > > simplifiedLayers(pointLayers.size());
 
     float dpTol = options.fDouglasPeuckerTolerance;
     if (options.fAggressiveSimplification) dpTol *= 1.5f;
 
-    for (size_t k = 0; k < pointLayers.size(); k++) {
+    // Parallelize simplification over k layers
+    ParallelUtils::ParallelFor(0, pointLayers.size(), [&](int k) {
 	std::vector<std::vector<std::vector<double> > > layerPaths;
 	for (size_t i = 0; i < pointLayers[k].size(); i++) {
 	    std::vector<std::vector<double> > path = pointLayers[k][i];
@@ -307,7 +309,7 @@ PathSimplifier::BatchSimplifyPoints(
 		    double dy = next[1] - prev[1];
 		    double baseLength = std::sqrt(dx * dx + dy * dy);
 
-		    // Fix 1: Correct perpendicular distance calculation (avoid false collinearity on small scales)
+		    // Correct perpendicular distance calculation (avoid false collinearity on small scales)
 		    double distance = 0.0;
 		    if (baseLength < 1e-6) {
 			double cdx = curr[0] - prev[0];
@@ -319,7 +321,7 @@ PathSimplifier::BatchSimplifyPoints(
 			distance = area / baseLength;
 		    }
 
-		    // Fix 2: Limit the max segment length to prevent curve drift and cascading loop collapse
+		    // Limit the max segment length to prevent curve drift and cascading loop collapse
 		    if (distance > options.fCollinearTolerance || baseLength > 10.0) {
 			tempPath.push_back(curr);
 			tempProt.push_back(prot[p]);
@@ -331,6 +333,11 @@ PathSimplifier::BatchSimplifyPoints(
 
 		path = tempPath;
 		prot = tempProt;
+	    }
+
+	    if (path.size() < 3) {
+		layerPaths.push_back(path);
+		continue;
 	    }
 
 	    // 4. Curve Smoothing (respects protected AA-corners and their direct neighbors)
@@ -411,8 +418,9 @@ PathSimplifier::BatchSimplifyPoints(
 
 	    layerPaths.push_back(path);
 	}
-	simplifiedLayers.push_back(layerPaths);
-    }
+	simplifiedLayers[k] = layerPaths;
+    });
+
     return simplifiedLayers;
 }
 
