@@ -94,6 +94,14 @@ int main(int argc, char** argv) {
         res.set_content(embedded_index_html, "text/html; charset=utf-8");
     });
 
+    svr.Get("/tailwindcss.js", [](const httplib::Request& req, httplib::Response& res) {
+        res.set_content(embedded_tailwindcss_js, "application/javascript; charset=utf-8");
+    });
+
+    svr.Get("/haikon.js", [](const httplib::Request& req, httplib::Response& res) {
+        res.set_content(embedded_haikon_js, "application/javascript; charset=utf-8");
+    });
+
     svr.Get("/api/defaults", [](const httplib::Request& req, httplib::Response& res) {
         TracingOptions opt;
         std::ostringstream json;

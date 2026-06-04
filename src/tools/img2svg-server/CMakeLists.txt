@@ -1,17 +1,29 @@
 #
-# Copyright 2025, Gerasim Troeglazov, 3dEyes@gmail.com. All rights reserved.
+# Copyright 2025-2026, Gerasim Troeglazov, 3dEyes@gmail.com. All rights reserved.
 # Distributed under the terms of the MIT License.
 #
 
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "web/index.html")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "web/index.html"
+    "web/tailwindcss.js"
+    "web/haikon.js"
+)
 
 file(READ "web/index.html" HTML_CONTENT)
+file(READ "web/tailwindcss.js" TAILWIND_CONTENT)
+file(READ "web/haikon.js" HAIKON_CONTENT)
 
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/embedded_ui.h" 
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/embedded_ui.h"
 "/* Auto-generated file. Do not edit. */\n"
 "#pragma once\n\n"
 "static const char* embedded_index_html = R\"=====(\n"
 "${HTML_CONTENT}\n"
+")=====\";\n\n"
+"static const char* embedded_tailwindcss_js = R\"=====(\n"
+"${TAILWIND_CONTENT}\n"
+")=====\";\n\n"
+"static const char* embedded_haikon_js = R\"=====(\n"
+"${HAIKON_CONTENT}\n"
 ")=====\";\n"
 )
 
