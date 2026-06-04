@@ -94,6 +94,47 @@ int main(int argc, char** argv) {
         res.set_content(embedded_index_html, "text/html; charset=utf-8");
     });
 
+    svr.Get("/api/defaults", [](const httplib::Request& req, httplib::Response& res) {
+        TracingOptions opt;
+        std::ostringstream json;
+        
+        json << "{";
+        json << "\"colors\": " << opt.fNumberOfColors << ",";
+        json << "\"colorquantcycles\": " << opt.fColorQuantizationCycles << ",";
+        json << "\"ltres\": " << opt.fLineThreshold << ",";
+        json << "\"qtres\": " << opt.fQuadraticThreshold << ",";
+        json << "\"pathomit\": " << opt.fPathOmitThreshold << ",";
+        json << "\"remove_bg\": " << (opt.fRemoveBackground ? "true" : "false") << ",";
+        json << "\"bg_method\": " << (int)opt.fBackgroundMethod << ",";
+        json << "\"bg_tolerance\": " << opt.fBackgroundTolerance << ",";
+        json << "\"bg_ratio\": " << opt.fMinBackgroundRatio << ",";
+        json << "\"blurradius\": " << opt.fBlurRadius << ",";
+        json << "\"blurdelta\": " << opt.fBlurDelta << ",";
+        json << "\"douglas\": " << (opt.fDouglasPeuckerEnabled ? "true" : "false") << ",";
+        json << "\"douglas_tolerance\": " << opt.fDouglasPeuckerTolerance << ",";
+        json << "\"douglas_curves\": " << (opt.fDouglasPeuckerCurveProtection > 0.5f ? "true" : "false") << ",";
+        json << "\"aggressive_simplify\": " << (opt.fAggressiveSimplification ? "true" : "false") << ",";
+        json << "\"collinear_tolerance\": " << opt.fCollinearTolerance << ",";
+        json << "\"min_segment_length\": " << opt.fMinSegmentLength << ",";
+        json << "\"curve_smoothing\": " << opt.fCurveSmoothing << ",";
+        json << "\"vw_enable\": " << (opt.fVisvalingamWhyattEnabled ? "true" : "false") << ",";
+        json << "\"vw_tolerance\": " << opt.fVisvalingamWhyattTolerance << ",";
+        json << "\"detect_gradients\": " << (opt.fDetectGradients ? "true" : "false") << ",";
+        json << "\"grad_r2\": " << opt.fGradientMinR2 << ",";
+        json << "\"grad_delta\": " << opt.fGradientMinDelta << ",";
+        json << "\"grad_stride\": " << opt.fGradientSampleStride << ",";
+        json << "\"detect_geometry\": " << (opt.fDetectGeometry ? "true" : "false") << ",";
+        json << "\"line_tolerance\": " << opt.fLineTolerance << ",";
+        json << "\"circle_tolerance\": " << opt.fCircleTolerance << ",";
+        json << "\"filter_small\": " << (opt.fFilterSmallObjects ? "true" : "false") << ",";
+        json << "\"min_area\": " << opt.fMinObjectArea << ",";
+        json << "\"min_perimeter\": " << opt.fMinObjectPerimeter;
+        json << "}";
+
+        res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_content(json.str(), "application/json");
+    });
+
     svr.Post("/api/vectorize", [](const httplib::Request& req, httplib::Response& res) {
         res.set_header("Access-Control-Allow-Origin", "*");
 
