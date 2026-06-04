@@ -231,6 +231,7 @@ int main(int argc, char** argv) {
     });
 
     std::cout << "Starting img2svg Studio Server...\n";
+    std::cout << "Available CPU cores: " << std::thread::hardware_concurrency() << "\n";
     std::cout << "Listening on http://" << host << ":" << port << "\n";
 
     if (!svr.listen(host.c_str(), port)) {
