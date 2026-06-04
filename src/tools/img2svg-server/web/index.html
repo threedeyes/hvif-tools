@@ -376,7 +376,17 @@
         }
 
         // Init Presets
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const res = await fetch('/api/defaults');
+                if (res.ok) {
+                    const serverDefaults = await res.json();
+                    applySettings(serverDefaults);
+                }
+            } catch (err) {
+                console.error('Failed to load defaults from server, using HTML defaults', err);
+            }
+
             defaultPreset = getCurrentSettings();
             updatePresetSelect();
         });
