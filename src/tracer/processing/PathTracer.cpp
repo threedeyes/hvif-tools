@@ -58,8 +58,8 @@ PathTracer::BatchTracePaths(const std::vector<std::vector<std::vector<std::vecto
 
 std::vector<std::vector<double> >
 PathTracer::_FitSequence(const std::vector<std::vector<double> >& path,
-			float lineThreshold, float quadraticThreshold,
-			int sequenceStart, int sequenceEnd, int depth, SharedEdgeRegistry* registry)
+	    float lineThreshold, float quadraticThreshold,
+	    int sequenceStart, int sequenceEnd, int depth, SharedEdgeRegistry* registry)
 {
     std::vector<std::vector<double> > segment;
     int pathLength = path.size();
@@ -106,14 +106,25 @@ PathTracer::_FitSequence(const std::vector<std::vector<double> >& path,
 
     double dxLine = path[sequenceEnd - 1][0] - path[sequenceStart][0];
     double dyLine = path[sequenceEnd - 1][1] - path[sequenceStart][1];
+    double lineLength2 = dxLine * dxLine + dyLine * dyLine;
 
     for (int pointIndex = sequenceStart + 1; pointIndex < sequenceEnd - 1; pointIndex++) {
-	double t = u[pointIndex - sequenceStart];
-	pointX = path[sequenceStart][0] + dxLine * t;
-	pointY = path[sequenceStart][1] + dyLine * t;
+	double px = path[pointIndex][0];
+	double py = path[pointIndex][1];
 
-	distance2 = ((path[pointIndex][0] - pointX) * (path[pointIndex][0] - pointX)) +
-		   ((path[pointIndex][1] - pointY) * (path[pointIndex][1] - pointY));
+	// Use perpendicular distance instead of parametric distance to fix staircase effect
+	if (lineLength2 == 0.0) {
+	    distance2 = (px - path[sequenceStart][0]) * (px - path[sequenceStart][0]) +
+			(py - path[sequenceStart][1]) * (py - path[sequenceStart][1]);
+	} else {
+	    double t_proj = ((px - path[sequenceStart][0]) * dxLine + (py - path[sequenceStart][1]) * dyLine) / lineLength2;
+	    t_proj = std::max(0.0, std::min(1.0, t_proj));
+	    
+	    pointX = path[sequenceStart][0] + t_proj * dxLine;
+	    pointY = path[sequenceStart][1] + t_proj * dyLine;
+	    
+	    distance2 = (px - pointX) * (px - pointX) + (py - pointY) * (py - pointY);
+	}
 
 	if (distance2 > lineThreshold) {
 	    curvePass = false;
@@ -205,7 +216,7 @@ PathTracer::_FitSequence(const std::vector<std::vector<double> >& path,
 	pointY = (t1 * path[sequenceStart][1]) + (t2 * controlPointY) + (t3 * path[sequenceEnd - 1][1]);
 
 	distance2 = ((path[pointIndex][0] - pointX) * (path[pointIndex][0] - pointX)) +
-		   ((path[pointIndex][1] - pointY) * (path[pointIndex][1] - pointY));
+	       ((path[pointIndex][1] - pointY) * (path[pointIndex][1] - pointY));
 
 	if (distance2 > quadraticThreshold)
 	    curvePass = false;
