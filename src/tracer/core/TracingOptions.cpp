@@ -17,7 +17,7 @@ TracingOptions::SetDefaults()
 	fQuadraticThreshold = 0.5f;
 	fPathOmitThreshold = 10.0f;
 
-	fNumberOfColors = 8.0f;
+	fNumberOfColors = 16.0f;
 	fColorQuantizationCycles = 16.0f;
 
 	fScale = 1.0f;
@@ -34,7 +34,7 @@ TracingOptions::SetDefaults()
 	fBackgroundTolerance = 10;
 	fMinBackgroundRatio = 0.3;
 
-	fDouglasPeuckerEnabled = false;
+	fDouglasPeuckerEnabled = true;
 	fDouglasPeuckerTolerance = 0.5f;
 	fDouglasPeuckerCurveProtection = 0.5f;
 
@@ -48,7 +48,7 @@ TracingOptions::SetDefaults()
 	fRemoveDuplicates = true;
 
 	fAggressiveSimplification = false;
-	fCollinearTolerance = 1.0f;
+	fCollinearTolerance = 0.1f;
 	fMinSegmentLength = 2.0f;
 	fCurveSmoothing = 0.0f;
 
