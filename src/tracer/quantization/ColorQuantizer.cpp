@@ -88,143 +88,158 @@ ColorQuantizer::_ComputeEdgeStrength(const BitmapData& bitmap, int cx, int cy)
 
 void
 ColorQuantizer::_AdaptiveSpatialCoherence(std::vector<std::vector<int> >& indexArray,
-										const BitmapData& bitmap,
-										int width, int height,
-										int radius, int passes)
+					const BitmapData& bitmap,
+					int width, int height,
+					int radius, int passes)
 {
-	if (radius < 1 || passes < 1)
-		return;
+    if (radius < 1 || passes < 1)
+	return;
 
-	int paletteSize = 0;
-	for (int y = 1; y < height + 1; y++) {
-		for (int x = 1; x < width + 1; x++) {
-			if (indexArray[y][x] > paletteSize) {
-				paletteSize = indexArray[y][x];
+    int paletteSize = 0;
+    for (int y = 1; y < height + 1; y++) {
+	for (int x = 1; x < width + 1; x++) {
+	    if (indexArray[y][x] > paletteSize) {
+		paletteSize = indexArray[y][x];
+	    }
+	}
+    }
+    paletteSize++;
+
+    std::vector<std::vector<double> > edgeStrength(height + 2);
+    for (int y = 0; y < height + 2; y++) {
+	edgeStrength[y].resize(width + 2, 0.0);
+    }
+
+    for (int y = 1; y < height + 1; y++) {
+	for (int x = 1; x < width + 1; x++) {
+	    edgeStrength[y][x] = _ComputeEdgeStrength(bitmap, x - 1, y - 1);
+	}
+    }
+
+    std::vector<std::vector<bool> > isColorBoundary(height + 2);
+    for (int y = 0; y < height + 2; y++) {
+	isColorBoundary[y].resize(width + 2, false);
+    }
+
+    for (int y = 1; y < height + 1; y++) {
+	for (int x = 1; x < width + 1; x++) {
+	    int centerIdx = indexArray[y][x];
+
+	    bool hasDifferentNeighbor = false;
+	    for (int dy = -1; dy <= 1; dy++) {
+		for (int dx = -1; dx <= 1; dx++) {
+		    if (dx == 0 && dy == 0) continue;
+		    int nx = x + dx;
+		    int ny = y + dy;
+		    if (nx >= 1 && nx < width + 1 && ny >= 1 && ny < height + 1) {
+			if (indexArray[ny][nx] != centerIdx) {
+			    hasDifferentNeighbor = true;
+			    break;
 			}
+		    }
 		}
-	}
-	paletteSize++;
+		if (hasDifferentNeighbor) break;
+	    }
 
-	std::vector<std::vector<double> > edgeStrength(height + 2);
-	for (int y = 0; y < height + 2; y++) {
-		edgeStrength[y].resize(width + 2, 0.0);
+	    isColorBoundary[y][x] = hasDifferentNeighbor;
 	}
+    }
 
+    double edgeThreshold = 20.0;
+    if (paletteSize <= 8) {
+	edgeThreshold = 15.0;
+    } else if (paletteSize <= 16) {
+	edgeThreshold = 18.0;
+    }
+
+    std::vector<std::vector<int> > temp = indexArray;
+
+    int actualPasses = passes;
+    if (paletteSize > 32) actualPasses += 1;
+    if (paletteSize > 48) actualPasses += 1;
+
+    for (int pass = 0; pass < actualPasses; pass++) {
 	for (int y = 1; y < height + 1; y++) {
-		for (int x = 1; x < width + 1; x++) {
-			edgeStrength[y][x] = _ComputeEdgeStrength(bitmap, x - 1, y - 1);
-		}
-	}
+	    for (int x = 1; x < width + 1; x++) {
+		int centerIdx = indexArray[y][x];
+		if (centerIdx < 0)
+		    continue;
 
-	std::vector<std::vector<bool> > isColorBoundary(height + 2);
-	for (int y = 0; y < height + 2; y++) {
-		isColorBoundary[y].resize(width + 2, false);
-	}
+		std::map<int, int> histogram;
+		int totalVotes = 0;
 
-	for (int y = 1; y < height + 1; y++) {
-		for (int x = 1; x < width + 1; x++) {
-			int centerIdx = indexArray[y][x];
-
-			bool hasDifferentNeighbor = false;
-			for (int dy = -1; dy <= 1; dy++) {
-				for (int dx = -1; dx <= 1; dx++) {
-					if (dx == 0 && dy == 0) continue;
-					int nx = x + dx;
-					int ny = y + dy;
-					if (nx >= 1 && nx < width + 1 && ny >= 1 && ny < height + 1) {
-						if (indexArray[ny][nx] != centerIdx) {
-							hasDifferentNeighbor = true;
-							break;
-						}
-					}
-				}
-				if (hasDifferentNeighbor) break;
+		for (int dy = -radius; dy <= radius; dy++) {
+		    for (int dx = -radius; dx <= radius; dx++) {
+			int ny = y + dy;
+			int nx = x + dx;
+			if (ny >= 1 && ny < height + 1 && nx >= 1 && nx < width + 1) {
+			    int idx = indexArray[ny][nx];
+			    if (idx >= 0) {
+				histogram[idx]++;
+				totalVotes++;
+			    }
 			}
-
-			isColorBoundary[y][x] = hasDifferentNeighbor;
-		}
-	}
-
-	double edgeThreshold = 20.0;
-	if (paletteSize <= 8) {
-		edgeThreshold = 15.0;
-	} else if (paletteSize <= 16) {
-		edgeThreshold = 18.0;
-	}
-
-	std::vector<std::vector<int> > temp = indexArray;
-
-	int actualPasses = passes;
-	if (paletteSize > 32) actualPasses += 1;
-	if (paletteSize > 48) actualPasses += 1;
-
-	for (int pass = 0; pass < actualPasses; pass++) {
-		for (int y = 1; y < height + 1; y++) {
-			for (int x = 1; x < width + 1; x++) {
-				int centerIdx = indexArray[y][x];
-				if (centerIdx < 0)
-					continue;
-
-				if (isColorBoundary[y][x] && edgeStrength[y][x] > edgeThreshold * 0.5)
-					continue;
-
-				if (edgeStrength[y][x] > edgeThreshold)
-					continue;
-
-				std::map<int, int> histogram;
-				int totalVotes = 0;
-
-				for (int dy = -radius; dy <= radius; dy++) {
-					for (int dx = -radius; dx <= radius; dx++) {
-						int ny = y + dy;
-						int nx = x + dx;
-						if (ny >= 1 && ny < height + 1 && nx >= 1 && nx < width + 1) {
-							int idx = indexArray[ny][nx];
-							if (idx >= 0) {
-								histogram[idx]++;
-								totalVotes++;
-							}
-						}
-					}
-				}
-
-				if (totalVotes == 0) {
-					temp[y][x] = centerIdx;
-					continue;
-				}
-
-				int maxCount = 0;
-				int mostFrequent = centerIdx;
-
-				for (std::map<int, int>::const_iterator it = histogram.begin(); 
-					 it != histogram.end(); ++it) {
-					if (it->second > maxCount) {
-						maxCount = it->second;
-						mostFrequent = it->first;
-					}
-				}
-
-				double consensusRatio = (double)maxCount / (double)totalVotes;
-				double threshold = 0.65;
-
-				if (edgeStrength[y][x] < edgeThreshold * 0.3)
-					threshold = 0.50;
-				else if (edgeStrength[y][x] < edgeThreshold * 0.6)
-					threshold = 0.55;
-
-				if (paletteSize > 32)
-					threshold = 0.60;
-
-				if (consensusRatio >= threshold) {
-					temp[y][x] = mostFrequent;
-				} else {
-					temp[y][x] = centerIdx;
-				}
-			}
+		    }
 		}
 
-		indexArray = temp;
+		if (totalVotes == 0) {
+		    temp[y][x] = centerIdx;
+		    continue;
+		}
+
+		int maxCount = 0;
+		int mostFrequent = centerIdx;
+		int centerCount = 0;
+
+		for (std::map<int, int>::const_iterator it = histogram.begin();
+		     it != histogram.end(); ++it) {
+		    if (it->first == centerIdx) {
+			centerCount = it->second;
+		    }
+		    if (it->second > maxCount) {
+			maxCount = it->second;
+			mostFrequent = it->first;
+		    }
+		}
+
+		double consensusRatio = (double)maxCount / (double)totalVotes;
+		double centerRatio = (double)centerCount / (double)totalVotes;
+
+		// Identify anti-aliasing slivers: color is minority, sits on boundary,
+		// and another color has a solid (but not overwhelming) lead
+		bool isAntiAliasingSliver = isColorBoundary[y][x] &&
+					    centerRatio < 0.30 &&
+					    consensusRatio >= 0.35 &&
+					    consensusRatio <= 0.70 &&
+					    mostFrequent != centerIdx;
+
+		bool isVeryStrongEdge = isColorBoundary[y][x] && edgeStrength[y][x] > edgeThreshold * 0.75;
+
+		// Protect extremely sharp borders, EXCEPT when they are anti-aliasing artifacts
+		if (isVeryStrongEdge && !isAntiAliasingSliver) {
+		    temp[y][x] = centerIdx;
+		    continue;
+		}
+
+		double threshold = 0.65;
+		if (edgeStrength[y][x] < edgeThreshold * 0.3)
+		    threshold = 0.50;
+		else if (edgeStrength[y][x] < edgeThreshold * 0.6)
+		    threshold = 0.55;
+
+		if (paletteSize > 32)
+		    threshold = 0.60;
+
+		if (isAntiAliasingSliver || consensusRatio >= threshold) {
+		    temp[y][x] = mostFrequent;
+		} else {
+		    temp[y][x] = centerIdx;
+		}
+	    }
 	}
+
+	indexArray = temp;
+    }
 }
 
 void
