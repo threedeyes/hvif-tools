@@ -197,7 +197,7 @@ PathSimplifier::BatchSimplifyPoints(
 		continue;
 	    }
 
-	    // 1. Build initial protection map (topology junctions)
+	    // 1. Initial Topology Protection
 	    std::vector<bool> prot(path.size(), false);
 	    prot[0] = true;
 	    prot.back() = true;
@@ -208,7 +208,60 @@ PathSimplifier::BatchSimplifyPoints(
 		}
 	    }
 
-	    // 2. Safe Min Segment Length (respects protected junctions)
+	    // 1b. Protect structural axis-aligned 90-degree corners (rectangles, borders) on raw path
+	    int n = path.size();
+	    for (int p = 0; p < n; p++) {
+		int prev_idx = (p - 1 + n) % n;
+		int next_idx = (p + 1) % n;
+
+		double dx1 = path[p][0] - path[prev_idx][0];
+		double dy1 = path[p][1] - path[prev_idx][1];
+		double dx2 = path[next_idx][0] - path[p][0];
+		double dy2 = path[next_idx][1] - path[p][1];
+
+		// Check if segments meet at 90 degrees strictly along axes
+		bool isAA_90 = ((std::fabs(dx1) < 1e-5 && std::fabs(dy1) > 1e-5 && std::fabs(dy2) < 1e-5 && std::fabs(dx2) > 1e-5) ||
+				(std::fabs(dy1) < 1e-5 && std::fabs(dx1) > 1e-5 && std::fabs(dx2) < 1e-5 && std::fabs(dy2) > 1e-5));
+		
+		if (isAA_90) {
+		    // Count straight run backwards (up to 5 segments to prevent deep loops)
+		    int runBack = 0;
+		    int curr = prev_idx;
+		    while (runBack < 5) {
+			int prev = (curr - 1 + n) % n;
+			double ndx = path[curr][0] - path[prev][0];
+			double ndy = path[curr][1] - path[prev][1];
+			if (std::fabs(ndx - dx1) < 1e-5 && std::fabs(ndy - dy1) < 1e-5) {
+			    runBack++;
+			    curr = prev;
+			} else {
+			    break;
+			}
+		    }
+
+		    // Count straight run forwards (up to 5 segments)
+		    int runForw = 0;
+		    int currF = next_idx;
+		    while (runForw < 5) {
+			int next = (currF + 1) % n;
+			double ndx = path[next][0] - path[currF][0];
+			double ndy = path[next][1] - path[currF][1];
+			if (std::fabs(ndx - dx2) < 1e-5 && std::fabs(ndy - dy2) < 1e-5) {
+			    runForw++;
+			    currF = next;
+			} else {
+			    break;
+			}
+		    }
+
+		    // Protect corner if both incoming and outgoing segments are structural (run length >= 2)
+		    if (runBack >= 2 && runForw >= 2) {
+			prot[p] = true;
+		    }
+		}
+	    }
+
+	    // 2. Safe Min Segment Length (respects protected junctions and AA-corners)
 	    if (options.fMinSegmentLength > 0) {
 		std::vector<std::vector<double> > tempPath;
 		std::vector<bool> tempProt;
@@ -232,7 +285,7 @@ PathSimplifier::BatchSimplifyPoints(
 		prot = tempProt;
 	    }
 
-	    // 3. Safe Collinear Tolerance (respects protected junctions)
+	    // 3. Safe Collinear Tolerance (respects protected junctions and AA-corners)
 	    if (options.fCollinearTolerance > 0 && path.size() >= 3) {
 		std::vector<std::vector<double> > tempPath;
 		std::vector<bool> tempProt;
@@ -250,12 +303,24 @@ PathSimplifier::BatchSimplifyPoints(
 		    const std::vector<double>& curr = path[p];
 		    const std::vector<double>& next = path[p + 1];
 
-		    double area = std::fabs((curr[0] - prev[0]) * (next[1] - prev[1]) -
-					    (next[0] - prev[0]) * (curr[1] - prev[1]));
-		    double baseLength = std::sqrt((next[0] - prev[0]) * (next[0] - prev[0]) +
-						  (next[1] - prev[1]) * (next[1] - prev[1]));
+		    double dx = next[0] - prev[0];
+		    double dy = next[1] - prev[1];
+		    double baseLength = std::sqrt(dx * dx + dy * dy);
 
-		    if (area / std::max(baseLength, 1.0) > options.fCollinearTolerance) {
+		    // Fix 1: Correct perpendicular distance calculation (avoid false collinearity on small scales)
+		    double distance = 0.0;
+		    if (baseLength < 1e-6) {
+			double cdx = curr[0] - prev[0];
+			double cdy = curr[1] - prev[1];
+			distance = std::sqrt(cdx * cdx + cdy * cdy);
+		    } else {
+			double area = std::fabs((curr[0] - prev[0]) * (next[1] - prev[1]) -
+						(next[0] - prev[0]) * (curr[1] - prev[1]));
+			distance = area / baseLength;
+		    }
+
+		    // Fix 2: Limit the max segment length to prevent curve drift and cascading loop collapse
+		    if (distance > options.fCollinearTolerance || baseLength > 10.0) {
 			tempPath.push_back(curr);
 			tempProt.push_back(prot[p]);
 		    }
@@ -268,18 +333,37 @@ PathSimplifier::BatchSimplifyPoints(
 		prot = tempProt;
 	    }
 
-	    if (path.size() < 3) {
-		layerPaths.push_back(path);
-		continue;
-	    }
-
-	    // 4. Curve Smoothing
+	    // 4. Curve Smoothing (respects protected AA-corners and their direct neighbors)
 	    if (options.fCurveSmoothing > 0) {
+		std::vector<bool> smoothProt = prot;
+
+		// Protect direct neighbors of structural AA-corners to keep incoming lines straight
+		int sn = path.size();
+		for (int p = 0; p < sn; p++) {
+		    if (prot[p]) {
+			int prev_idx = (p - 1 + sn) % sn;
+			int next_idx = (p + 1) % sn;
+
+			double dx1 = path[p][0] - path[prev_idx][0];
+			double dy1 = path[p][1] - path[prev_idx][1];
+			double dx2 = path[next_idx][0] - path[p][0];
+			double dy2 = path[next_idx][1] - path[p][1];
+
+			bool isAA_90 = ((std::fabs(dx1) < 1e-5 && std::fabs(dy1) > 1e-5 && std::fabs(dy2) < 1e-5 && std::fabs(dx2) > 1e-5) ||
+					(std::fabs(dy1) < 1e-5 && std::fabs(dx1) > 1e-5 && std::fabs(dx2) < 1e-5 && std::fabs(dy2) > 1e-5));
+			
+			if (isAA_90) {
+			    smoothProt[prev_idx] = true;
+			    smoothProt[next_idx] = true;
+			}
+		    }
+		}
+
 		int smoothPasses = static_cast<int>(options.fCurveSmoothing * 3);
 		for (int iter = 0; iter < smoothPasses; iter++) {
 		    std::vector<std::vector<double> > sm = path;
 		    for (size_t p = 1; p < path.size() - 1; p++) {
-			if (!prot[p]) {
+			if (!smoothProt[p]) {
 			    sm[p][0] = 0.4 * path[p][0] + 0.3 * path[p-1][0] + 0.3 * path[p+1][0];
 			    sm[p][1] = 0.4 * path[p][1] + 0.3 * path[p-1][1] + 0.3 * path[p+1][1];
 			}
