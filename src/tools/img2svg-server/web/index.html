@@ -231,13 +231,18 @@
             </h2>
         </div>
         
-        <div class="p-4 space-y-8 flex-1 text-sm">
-            <div>
-                <h3 class="text-blue-400 font-semibold mb-3 uppercase tracking-wider text-xs">Original Bitmap</h3>
-                <div class="space-y-3 text-gray-400">
+        <div class="p-4 space-y-6 flex-1 text-sm">
+            
+            <!-- BLOCK 1: ORIGINAL BITMAP -->
+            <div id="blockBitmap" class="hidden flex flex-col">
+                <h3 class="text-blue-400 font-semibold mb-2 uppercase tracking-wider text-xs">Original Bitmap</h3>
+                <div class="bg-gray-900 rounded p-2 border border-gray-700 checkerboard mb-3 flex justify-center items-center h-28 overflow-hidden">
+                    <img id="thumbBitmap" class="max-h-full max-w-full object-contain pointer-events-none">
+                </div>
+                <div class="space-y-1.5 text-gray-400">
                     <div class="flex justify-between border-b border-gray-700 pb-1">
                         <span class="text-gray-500">Name</span>
-                        <span id="infoOrigName" class="truncate ml-4 max-w-[150px] text-gray-300">-</span>
+                        <span id="infoOrigName" class="truncate ml-4 max-w-[140px] text-gray-300">-</span>
                     </div>
                     <div class="flex justify-between border-b border-gray-700 pb-1">
                         <span class="text-gray-500">Format</span>
@@ -254,41 +259,79 @@
                 </div>
             </div>
 
-            <div>
-                <h3 class="text-blue-400 font-semibold mb-3 uppercase tracking-wider text-xs">Vector Result</h3>
-                <div class="space-y-3 text-gray-400">
+            <!-- BLOCK 2: SVG RESULT -->
+            <div id="blockSvg" class="hidden flex flex-col pt-4 border-t border-gray-700">
+                <h3 class="text-green-400 font-semibold mb-2 uppercase tracking-wider text-xs">Vector Result (SVG)</h3>
+                <div class="bg-gray-900 rounded p-2 border border-gray-700 checkerboard mb-3 flex justify-center items-center h-28 overflow-hidden">
+                    <div id="thumbSvg" class="h-full w-full flex justify-center items-center [&>svg]:max-h-full [&>svg]:max-w-full [&>svg]:w-auto [&>svg]:h-auto"></div>
+                </div>
+                <div class="space-y-1.5 text-gray-400 mb-3">
                     <div class="flex justify-between border-b border-gray-700 pb-1">
-                        <span class="text-gray-500">SVG Size</span>
+                        <span class="text-gray-500">File Size</span>
                         <span id="infoSvgSize" class="text-gray-300 font-mono">-</span>
                     </div>
                     <div class="flex justify-between border-b border-gray-700 pb-1">
-                        <span class="text-gray-500" title="Ratio of SVG size to original PNG/JPG size">Size Ratio</span>
-                        <span id="infoSvgRatio" class="text-gray-300 font-bold">-</span>
+                        <span class="text-gray-500" title="Ratio of SVG size to original image size">Size Ratio</span>
+                        <span id="infoSvgRatio" class="font-bold">-</span>
                     </div>
                     <div class="flex justify-between border-b border-gray-700 pb-1">
                         <span class="text-gray-500">Total Paths</span>
                         <span id="infoSvgPaths" class="text-gray-300 font-mono">-</span>
                     </div>
                     <div class="flex justify-between border-b border-gray-700 pb-1">
-                        <span class="text-gray-500" title="Approximate number of Bezier & Line commands">Total Nodes</span>
+                        <span class="text-gray-500">Total Nodes</span>
                         <span id="infoSvgNodes" class="text-gray-300 font-mono">-</span>
                     </div>
                     <div class="flex justify-between border-b border-gray-700 pb-1">
                         <span class="text-gray-500">Gradients</span>
                         <span id="infoSvgGrads" class="text-gray-300 font-mono">-</span>
                     </div>
-                    <div class="flex justify-between border-b border-gray-700 pb-1">
-                        <span class="text-gray-500">Process Time</span>
-                        <span id="infoSvgTime" class="text-gray-300 font-mono">-</span>
-                    </div>
                 </div>
-                
-                <button id="downloadBtn" class="mt-6 w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded shadow transition flex justify-center items-center hidden">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                <button id="downloadSvgBtn" class="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-1.5 px-4 rounded shadow transition flex justify-center items-center text-sm">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
                     Download SVG
                 </button>
             </div>
-            
+
+            <!-- BLOCK 3: HVIF RESULT -->
+            <div id="blockHvif" class="hidden flex flex-col pt-4 border-t border-gray-700">
+                <h3 class="text-orange-400 font-semibold mb-2 uppercase tracking-wider text-xs">Haiku Icon (HVIF)</h3>
+                <div class="bg-gray-900 rounded p-2 border border-gray-700 checkerboard mb-3 flex justify-center items-center h-28 overflow-hidden">
+                    <div id="thumbHvif" class="h-full w-full flex justify-center items-center [&>svg]:max-h-full [&>svg]:max-w-full [&>svg]:w-auto [&>svg]:h-auto"></div>
+                </div>
+                <div class="space-y-1.5 text-gray-400 mb-3">
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">File Size</span>
+                        <span id="infoHvifSize" class="text-gray-300 font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500" title="Ratio of HVIF size to original image size">Size Ratio</span>
+                        <span id="infoHvifRatio" class="font-bold">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">Styles</span>
+                        <span id="infoHvifStyles" class="text-gray-300 font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">Paths</span>
+                        <span id="infoHvifPaths" class="text-gray-300 font-mono">-</span>
+                    </div>
+                    <div class="flex justify-between border-b border-gray-700 pb-1">
+                        <span class="text-gray-500">Shapes</span>
+                        <span id="infoHvifShapes" class="text-gray-300 font-mono">-</span>
+                    </div>
+                </div>
+                <button id="downloadHvifBtn" class="w-full bg-orange-600 hover:bg-orange-500 text-white font-bold py-1.5 px-4 rounded shadow transition flex justify-center items-center text-sm">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Download HVIF
+                </button>
+            </div>
+
+            <!-- BLOCK 4: PROCESS TIME -->
+            <div id="blockTime" class="hidden pt-2 text-center text-gray-400 text-sm pb-4">
+                Process Time: <span id="infoProcessTime" class="text-white font-mono font-bold">-</span>
+            </div>
+
         </div>
     </div>
 
@@ -306,7 +349,8 @@
         const emptyState = document.getElementById('emptyState');
         const dropZoneBox = document.getElementById('dropZoneBox');
         
-        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadSvgBtn = document.getElementById('downloadSvgBtn');
+        const downloadHvifBtn = document.getElementById('downloadHvifBtn');
         const resetViewBtn = document.getElementById('resetViewBtn');
         
         let currentSvgData = null;
@@ -596,7 +640,6 @@
                 document.getElementById('infoSvgPaths').innerText = '-';
                 document.getElementById('infoSvgNodes').innerText = '-';
                 document.getElementById('infoSvgGrads').innerText = '-';
-                document.getElementById('infoSvgTime').innerText = '-';
                 document.getElementById('infoSvgRatio').className = 'text-gray-300 font-bold';
 
                 originalImage.onload = () => {
@@ -604,6 +647,13 @@
 
                     canvas.style.width = originalImage.naturalWidth + 'px';
                     canvas.style.height = originalImage.naturalHeight + 'px';
+                    
+                    document.getElementById('thumbBitmap').src = originalImage.src;
+                    document.getElementById('blockBitmap').classList.remove('hidden');
+                    
+                    document.getElementById('blockSvg').classList.add('hidden');
+                    document.getElementById('blockHvif').classList.add('hidden');
+                    document.getElementById('blockTime').classList.add('hidden');
                     
                     canvas.classList.remove('hidden');
                     emptyState.classList.add('hidden');
@@ -616,7 +666,6 @@
                     
                     resetView();
                     resetViewBtn.classList.remove('hidden');
-                    downloadBtn.classList.add('hidden');
                 };
             }
         });
@@ -653,9 +702,11 @@
 
                 originalImage.classList.add('hidden');
                 svgContent.classList.remove('hidden');
-                downloadBtn.classList.remove('hidden');
 
-                // Анализ SVG
+                document.getElementById('blockSvg').classList.remove('hidden');
+                document.getElementById('thumbSvg').innerHTML = data.svg;
+
+                // SVG analysis
                 const svgBlob = new Blob([data.svg]);
                 document.getElementById('infoSvgSize').innerText = formatBytes(svgBlob.size);
                 
@@ -666,8 +717,6 @@
                 if (ratio < 100) ratioEl.className = 'text-green-400 font-bold';
                 else if (ratio > 200) ratioEl.className = 'text-red-400 font-bold';
                 else ratioEl.className = 'text-yellow-400 font-bold';
-
-                document.getElementById('infoSvgTime').innerText = `${data.timeMs} ms`;
 
                 const paths = svgContent.querySelectorAll('path');
                 document.getElementById('infoSvgPaths').innerText = paths.length;
@@ -685,6 +734,66 @@
                 const grads = svgContent.querySelectorAll('linearGradient, radialGradient');
                 document.getElementById('infoSvgGrads').innerText = grads.length;
 
+                const blockHvif = document.getElementById('blockHvif');
+                if (data.hvif) {
+                    blockHvif.classList.remove('hidden');
+                    
+                    // Convert Base64 to binary array
+                    const binaryStr = window.atob(data.hvif.base64);
+                    const len = binaryStr.length;
+                    const bytes = new Uint8Array(len);
+                    for (let i = 0; i < len; i++) bytes[i] = binaryStr.charCodeAt(i);
+                    
+                    // Render HVIF via haikon.js
+                    try {
+                        const iconData = Haikon.parse(bytes);
+                        const wrapper = HaikonSvg.renderIcon(iconData, 96);
+                        const svgElement = wrapper.querySelector('svg');
+                        if (svgElement) {
+                            svgElement.removeAttribute('style');
+                            const thumbHvif = document.getElementById('thumbHvif');
+                            thumbHvif.innerHTML = '';
+                            thumbHvif.appendChild(svgElement);
+                        }
+                    } catch(e) {
+                        console.error("Haikon render error:", e);
+                    }
+
+                    // HVIF stats
+                    document.getElementById('infoHvifSize').innerText = formatBytes(data.hvif.size);
+                    
+                    const hvifRatio = ((data.hvif.size / originalFileSize) * 100).toFixed(1);
+                    const hvifRatioEl = document.getElementById('infoHvifRatio');
+                    hvifRatioEl.innerText = `${hvifRatio}%`;
+                    if (hvifRatio < 100) hvifRatioEl.className = 'text-green-400 font-bold';
+                    else if (hvifRatio > 200) hvifRatioEl.className = 'text-red-400 font-bold';
+                    else hvifRatioEl.className = 'text-yellow-400 font-bold';
+
+                    document.getElementById('infoHvifStyles').innerText = data.hvif.styles;
+                    document.getElementById('infoHvifPaths').innerText = data.hvif.paths;
+                    document.getElementById('infoHvifShapes').innerText = data.hvif.shapes;
+
+                    // Download HVIF button
+                    downloadHvifBtn.onclick = () => {
+                        const blob = new Blob([bytes], { type: 'application/octet-stream' });
+                        const url = URL.createObjectURL(blob);
+                        let baseName = fileInput.files[0] ? fileInput.files[0].name.split('.')[0] : 'icon';
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${baseName}.hvif`;
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        URL.revokeObjectURL(url);
+                    };
+                } else {
+                    blockHvif.classList.add('hidden');
+                }
+
+                // Process time
+                document.getElementById('blockTime').classList.remove('hidden');
+                document.getElementById('infoProcessTime').innerText = `${data.timeMs} ms`;
+
             } catch (err) {
                 alert('Vectorization Error: ' + err.message);
             } finally {
@@ -693,13 +802,14 @@
             }
         });
 
-        downloadBtn.addEventListener('click', () => {
+        downloadSvgBtn.addEventListener('click', () => {
             if (!currentSvgData) return;
             const blob = new Blob([currentSvgData], { type: 'image/svg+xml' });
             const url = URL.createObjectURL(blob);
+            let baseName = fileInput.files[0] ? fileInput.files[0].name.split('.')[0] : 'vectorized';
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'vectorized.svg';
+            a.download = `${baseName}.svg`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);

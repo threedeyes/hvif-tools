@@ -35,6 +35,10 @@ add_executable(img2svg-server
 )
 
 target_include_directories(img2svg-server PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/common
+    ${CMAKE_SOURCE_DIR}/src/import
+    ${CMAKE_SOURCE_DIR}/src/export
     ${CMAKE_SOURCE_DIR}/src/tracer
     ${CMAKE_SOURCE_DIR}/src/tracer/core
     ${CMAKE_SOURCE_DIR}/src/tracer/output
@@ -44,6 +48,7 @@ target_include_directories(img2svg-server PRIVATE
 
 target_link_libraries(img2svg-server PRIVATE
     hvif::tracer
+    hvif::tools
 )
 
 if(UNIX AND NOT APPLE AND NOT HAIKU)
