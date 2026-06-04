@@ -24,6 +24,7 @@
 #include "PathHierarchy.h"
 #include "SharedEdgeRegistry.h"
 #include "VectorizationProgress.h"
+#include "ParallelUtils.h"
 
 static void
 _ReportProgress(const TracingOptions& options, int stage, int percent)
@@ -355,32 +356,32 @@ ImageTracer::_CreatePalette(const BitmapData& bitmap, int colorCount, const Trac
     bool hasTransparency = false;
 
     for (int y = 0; y < bitmap.Height(); y++) {
-	for (int x = 0; x < bitmap.Width(); x++) {
-	    unsigned char a = bitmap.GetPixelComponent(x, y, 3);
-	    if (MathUtils::IsTransparent(a)) {
-		hasTransparency = true;
-		break;
-	    }
-	}
-	if (hasTransparency) break;
+    for (int x = 0; x < bitmap.Width(); x++) {
+        unsigned char a = bitmap.GetPixelComponent(x, y, 3);
+        if (MathUtils::IsTransparent(a)) {
+	hasTransparency = true;
+	break;
+        }
+    }
+    if (hasTransparency) break;
     }
 
     std::vector<std::vector<int> > pixels(bitmap.Height());
     for (int y = 0; y < bitmap.Height(); y++) {
-	pixels[y].resize(bitmap.Width());
-	for (int x = 0; x < bitmap.Width(); x++) {
-	    int r = bitmap.GetPixelComponent(x, y, 0);
-	    int g = bitmap.GetPixelComponent(x, y, 1);
-	    int b = bitmap.GetPixelComponent(x, y, 2);
-	    int a = bitmap.GetPixelComponent(x, y, 3);
+    pixels[y].resize(bitmap.Width());
+    for (int x = 0; x < bitmap.Width(); x++) {
+        int r = bitmap.GetPixelComponent(x, y, 0);
+        int g = bitmap.GetPixelComponent(x, y, 1);
+        int b = bitmap.GetPixelComponent(x, y, 2);
+        int a = bitmap.GetPixelComponent(x, y, 3);
 
-	    if (MathUtils::IsTransparent((unsigned char)a)) {
-		pixels[y][x] = -1;
-		continue;
-	    }
+        if (MathUtils::IsTransparent((unsigned char)a)) {
+	pixels[y][x] = -1;
+	continue;
+        }
 
-	    pixels[y][x] = (a << 24) | (r << 16) | (g << 8) | b;
-	}
+        pixels[y][x] = (a << 24) | (r << 16) | (g << 8) | b;
+    }
     }
 
     ColorQuantizer quantizer;
@@ -388,12 +389,12 @@ ImageTracer::_CreatePalette(const BitmapData& bitmap, int colorCount, const Trac
 
     std::vector<std::vector<unsigned char> > bytePalette;
     for (int i = 0; i < static_cast<int>(initialPalette.size()); i++) {
-	std::vector<unsigned char> color(4);
-	color[0] = (initialPalette[i] >> 16) & 0xFF;
-	color[1] = (initialPalette[i] >> 8) & 0xFF;
-	color[2] = initialPalette[i] & 0xFF;
-	color[3] = (initialPalette[i] >> 24) & 0xFF;
-	bytePalette.push_back(color);
+    std::vector<unsigned char> color(4);
+    color[0] = (initialPalette[i] >> 16) & 0xFF;
+    color[1] = (initialPalette[i] >> 8) & 0xFF;
+    color[2] = initialPalette[i] & 0xFF;
+    color[3] = (initialPalette[i] >> 24) & 0xFF;
+    bytePalette.push_back(color);
     }
 
     int maxIterations = static_cast<int>(options.fColorQuantizationCycles);
@@ -403,97 +404,116 @@ ImageTracer::_CreatePalette(const BitmapData& bitmap, int colorCount, const Trac
     double totalChangeHistory = 0.0;
     int consecutiveSmallChanges = 0;
 
+    // Optimization: Pre-allocate row-by-row thread-safe accumulators once outside the loop
+    std::vector<std::vector<std::vector<PixelSample> > > rowSamples(bitmap.Height(), 
+        std::vector<std::vector<PixelSample> >(bytePalette.size()));
+
     for (int iteration = 0; iteration < maxIterations; iteration++) {
-	std::vector<std::vector<PixelSample> > colorSamples(bytePalette.size());
+    // Clear accumulators from previous pass
+    for (int y = 0; y < bitmap.Height(); y++) {
+        for (size_t i = 0; i < bytePalette.size(); i++) {
+	rowSamples[y][i].clear();
+        }
+    }
 
-	for (int y = 0; y < bitmap.Height(); y++) {
-	    for (int x = 0; x < bitmap.Width(); x++) {
-		if (pixels[y][x] == -1)
-		    continue;
+    // Parallelize pixel classification over Y rows using ParallelUtils
+    ParallelUtils::ParallelFor(0, bitmap.Height(), [&](int y) {
+        for (int x = 0; x < bitmap.Width(); x++) {
+	if (pixels[y][x] == -1)
+	    continue;
 
-		int r = bitmap.GetPixelComponent(x, y, 0);
-		int g = bitmap.GetPixelComponent(x, y, 1);
-		int b = bitmap.GetPixelComponent(x, y, 2);
-		int a = bitmap.GetPixelComponent(x, y, 3);
+	int r = bitmap.GetPixelComponent(x, y, 0);
+	int g = bitmap.GetPixelComponent(x, y, 1);
+	int b = bitmap.GetPixelComponent(x, y, 2);
+	int a = bitmap.GetPixelComponent(x, y, 3);
 
-		if (MathUtils::IsTransparent((unsigned char)a))
-		    continue;
+	if (MathUtils::IsTransparent((unsigned char)a))
+	    continue;
 
-		int bestIdx = _FindNearestColorIndex(r, g, b, a, bytePalette, false);
+	int bestIdx = _FindNearestColorIndex(r, g, b, a, bytePalette, false);
 
-		PixelSample sample;
-		sample.r = r;
-		sample.g = g;
-		sample.b = b;
-		sample.a = a;
-		sample.saturation = MathUtils::CalculateSaturation(r, g, b);
-		sample.brightness = _CalculateBrightness(r, g, b);
+	PixelSample sample;
+	sample.r = r;
+	sample.g = g;
+	sample.b = b;
+	sample.a = a;
+	sample.saturation = MathUtils::CalculateSaturation(r, g, b);
+	sample.brightness = _CalculateBrightness(r, g, b);
 
-		colorSamples[bestIdx].push_back(sample);
-	    }
-	}
+	rowSamples[y][bestIdx].push_back(sample);
+        }
+    });
 
-	double iterationChange = 0.0;
+    // Fast sequential merge of thread-local results
+    std::vector<std::vector<PixelSample> > colorSamples(bytePalette.size());
+    for (int y = 0; y < bitmap.Height(); y++) {
+        for (size_t i = 0; i < bytePalette.size(); i++) {
+	colorSamples[i].insert(colorSamples[i].end(), 
+	    rowSamples[y][i].begin(), rowSamples[y][i].end());
+        }
+    }
 
-	for (int i = 0; i < static_cast<int>(bytePalette.size()); i++) {
-	    if (colorSamples[i].empty())
-		continue;
+    double iterationChange = 0.0;
 
-	    unsigned char oldR = bytePalette[i][0];
-	    unsigned char oldG = bytePalette[i][1];
-	    unsigned char oldB = bytePalette[i][2];
-	    unsigned char oldA = bytePalette[i][3];
+    for (int i = 0; i < static_cast<int>(bytePalette.size()); i++) {
+        if (colorSamples[i].empty())
+	continue;
 
-	    unsigned char newR, newG, newB, newA;
-	    _SelectRepresentativeColor(colorSamples[i], newR, newG, newB, newA, colorCount);
+        unsigned char oldR = bytePalette[i][0];
+        unsigned char oldG = bytePalette[i][1];
+        unsigned char oldB = bytePalette[i][2];
+        unsigned char oldA = bytePalette[i][3];
 
-	    double colorChange = MathUtils::PerceptualColorDistance(
-		oldR, oldG, oldB, oldA,
-		newR, newG, newB, newA
-	    );
+        unsigned char newR, newG, newB, newA;
+        _SelectRepresentativeColor(colorSamples[i], newR, newG, newB, newA, colorCount);
 
-	    iterationChange += colorChange;
+        double colorChange = MathUtils::PerceptualColorDistance(
+	oldR, oldG, oldB, oldA,
+	newR, newG, newB, newA
+        );
 
-	    bytePalette[i][0] = newR;
-	    bytePalette[i][1] = newG;
-	    bytePalette[i][2] = newB;
-	    bytePalette[i][3] = newA;
-	}
+        iterationChange += colorChange;
 
-	totalChangeHistory += iterationChange;
+        bytePalette[i][0] = newR;
+        bytePalette[i][1] = newG;
+        bytePalette[i][2] = newB;
+        bytePalette[i][3] = newA;
+    }
 
-	double convergenceThreshold = MathUtils::AdaptiveThreshold(colorCount, 5.0);
+    totalChangeHistory += iterationChange;
 
-	if (iterationChange < convergenceThreshold) {
-	    consecutiveSmallChanges++;
-	    if (consecutiveSmallChanges >= 2 && iteration >= 3) {
-		break;
-	    }
-	} else {
-	    consecutiveSmallChanges = 0;
-	}
+    double convergenceThreshold = MathUtils::AdaptiveThreshold(colorCount, 5.0);
 
-	if (iteration >= 5) {
-	    double avgChange = totalChangeHistory / (iteration + 1);
-	    if (iterationChange < avgChange * 0.05) {
-		break;
-	    }
-	}
+    if (iterationChange < convergenceThreshold) {
+        consecutiveSmallChanges++;
+        if (consecutiveSmallChanges >= 2 && iteration >= 3) {
+	break;
+        }
+    } else {
+        consecutiveSmallChanges = 0;
+    }
+
+    if (iteration >= 5) {
+        double avgChange = totalChangeHistory / (iteration + 1);
+        if (iterationChange < avgChange * 0.05) {
+	break;
+        }
+    }
     }
 
     std::vector<std::vector<unsigned char> > finalPalette;
 
     if (hasTransparency) {
-	std::vector<unsigned char> transparentColor(4);
-	transparentColor[0] = 0;
-	transparentColor[1] = 0;
-	transparentColor[2] = 0;
-	transparentColor[3] = 0;
-	finalPalette.push_back(transparentColor);
+    std::vector<unsigned char> transparentColor(4);
+    transparentColor[0] = 0;
+    transparentColor[1] = 0;
+    transparentColor[2] = 0;
+    transparentColor[3] = 0;
+    finalPalette.push_back(transparentColor);
     }
 
     for (int i = 0; i < static_cast<int>(bytePalette.size()); i++) {
-	finalPalette.push_back(bytePalette[i]);
+    finalPalette.push_back(bytePalette[i]);
     }
 
     return finalPalette;
