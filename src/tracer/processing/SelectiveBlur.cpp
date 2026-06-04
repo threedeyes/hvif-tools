@@ -80,7 +80,7 @@ SelectiveBlur::BlurBitmap(const BitmapData& bitmap, float radius, float delta)
 		}
 	}
 
-	std::vector<unsigned char> horizontalBlurredData = result.Data();
+	const std::vector<unsigned char>& horizontalBlurredData = result.Data();
 
 	// Vertical blur pass
 	for (int y = 0; y < bitmap.Height(); y++) {
