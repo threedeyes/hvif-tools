@@ -121,9 +121,15 @@ ImageTracer::BitmapToTraceData(const BitmapData& bitmap, const TracingOptions& o
         batchInternodes = simplifier.BatchSimplifyPoints(batchInternodes, options, &registry);
     }
 
+    // Keep an unmodified copy of the internodes for clean gradient color sampling
+    std::vector<std::vector<std::vector<std::vector<double> > > > uninflatedInternodes;
+    if (options.fDetectGradients) {
+	uninflatedInternodes = batchInternodes;
+    }
+
     // Inflate simplified polygon vertices slightly outward along their normals
     // to close anti-aliasing gaps without bloating SVG/HVIF files with stroke properties
-    const double inflateDistance = 1.2;
+    const double inflateDistance = 1.5;
 
     for (size_t k = 0; k < batchInternodes.size(); k++) {
         for (size_t i = 0; i < batchInternodes[k].size(); i++) {
@@ -141,6 +147,7 @@ ImageTracer::BitmapToTraceData(const BitmapData& bitmap, const TracingOptions& o
 
             std::vector<std::vector<double>> inflatedPath = path;
 
+            // Check if the path is explicitly closed (first and last vertices are identical)
             bool isClosed = (std::abs(path.front()[0] - path.back()[0]) < 1e-5 && 
                              std::abs(path.front()[1] - path.back()[1]) < 1e-5);
 
@@ -214,8 +221,18 @@ ImageTracer::BitmapToTraceData(const BitmapData& bitmap, const TracingOptions& o
     }
 
     _ReportProgress(options, STAGE_TRACE_PATHS, 60);
-
     PathTracer tracer;
+
+    // Trace clean uninflated layers specifically for gradient detection
+    std::vector<std::vector<std::vector<std::vector<double> > > > uninflatedLayers;
+    if (options.fDetectGradients) {
+        uninflatedLayers = tracer.BatchTracePaths(uninflatedInternodes,
+                                              options.fLineThreshold,
+                                              options.fQuadraticThreshold,
+                                              &registry);
+    }
+
+    // Trace inflated layers for final gap-free render output
     std::vector<std::vector<std::vector<std::vector<double> > > > layers = tracer.BatchTracePaths(batchInternodes,
 					  options.fLineThreshold,
 					  options.fQuadraticThreshold,
@@ -245,8 +262,9 @@ ImageTracer::BitmapToTraceData(const BitmapData& bitmap, const TracingOptions& o
     if (options.fDetectGradients) {
 	_ReportProgress(options, STAGE_DETECT_GRADIENTS, 90);
 	GradientDetector grad;
+	// Pass uninflatedLayers to avoid border-color contamination in linear regression
 	std::vector<std::vector<IndexedBitmap::LinearGradient> > grads =
-	    grad.DetectLinearGradients(indexedBitmap, processedBitmap, layers, options);
+	    grad.DetectLinearGradients(indexedBitmap, processedBitmap, uninflatedLayers, options);
 	indexedBitmap.SetLinearGradients(grads);
     }
 
