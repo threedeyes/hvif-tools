@@ -55,9 +55,9 @@ SvgWriter::_ColorToSvgString(const std::vector<unsigned char>& color, double str
 {
 	std::ostringstream stream;
 	stream << std::hex << std::setfill('0');
-	stream << "#" << std::setw(2) << static_cast<int>(color[0]) 
-		   << std::setw(2) << static_cast<int>(color[1]) 
-		   << std::setw(2) << static_cast<int>(color[2]);
+	stream << "#" << std::setw(2) << static_cast<int>(color[0])
+		<< std::setw(2) << static_cast<int>(color[1])
+		<< std::setw(2) << static_cast<int>(color[2]);
 
 	std::string hexColor = stream.str();
 	std::ostringstream result;
@@ -66,15 +66,11 @@ SvgWriter::_ColorToSvgString(const std::vector<unsigned char>& color, double str
 
 	if (color[3] == 0) {
 		result << "fill=\"none\" stroke=\"none\" ";
-	} else if (color[3] < 255) {
+	} else {
 		result << "fill=\"" << hexColor << "\" stroke=\"none\" ";
 		if (opacity < 0.999) {
 			result << "opacity=\"" << opacity << "\" ";
 		}
-	} else {
-		result << "fill=\"" << hexColor << "\" stroke=\"" << hexColor << "\" "
-			   << "stroke-width=\"1.5\" paint-order=\"stroke\" "
-			   << "stroke-linejoin=\"round\" stroke-linecap=\"round\" ";
 	}
 
 	return result.str();
@@ -503,19 +499,7 @@ SvgWriter::GenerateSvg(const IndexedBitmap& indexedBitmap, const TracingOptions&
 			std::ostringstream gradientFill;
 			std::string gradUrl = "url(#lg_" + std::to_string(layer) + "_" + std::to_string(parentPath) + ")";
 
-			const auto& g = gradsRef[layer][parentPath];
-			bool isOpaque = (g.c1[3] >= 255 && g.c2[3] >= 255);
-
-			gradientFill << "fill=\"" << gradUrl << "\" ";
-
-			if (isOpaque) {
-				gradientFill << "stroke=\"" << gradUrl << "\" "
-							 << "stroke-width=\"1.5\" paint-order=\"stroke\" "
-							 << "stroke-linejoin=\"round\" stroke-linecap=\"round\" ";
-			} else {
-				gradientFill << "stroke=\"none\" ";
-			}
-
+			gradientFill << "fill=\"" << gradUrl << "\" stroke=\"none\" ";
 			colorString = gradientFill.str();
 		}
 

@@ -116,12 +116,105 @@ ImageTracer::BitmapToTraceData(const BitmapData& bitmap, const TracingOptions& o
 			      options.fCurveSmoothing > 0;
 
     if (needSimplification) {
-	_ReportProgress(options, STAGE_SIMPLIFY_DP, 50);
-	PathSimplifier simplifier;
-	batchInternodes = simplifier.BatchSimplifyPoints(batchInternodes, options, &registry);
+        _ReportProgress(options, STAGE_SIMPLIFY_DP, 50);
+        PathSimplifier simplifier;
+        batchInternodes = simplifier.BatchSimplifyPoints(batchInternodes, options, &registry);
+    }
+
+    // Inflate simplified polygon vertices slightly outward along their normals
+    // to close anti-aliasing gaps without bloating SVG/HVIF files with stroke properties
+    const double inflateDistance = 1.2;
+
+    for (size_t k = 0; k < batchInternodes.size(); k++) {
+        for (size_t i = 0; i < batchInternodes[k].size(); i++) {
+            auto& path = batchInternodes[k][i];
+            if (path.size() < 3) continue;
+
+            // Calculate signed area to determine winding order
+            double area = 0.0;
+            int n = path.size();
+            for (int p = 0; p < n; p++) {
+                int next_p = (p + 1) % n;
+                area += (path[p][0] * path[next_p][1] - path[next_p][0] * path[p][1]);
+            }
+            bool isClockwise = (area < 0.0);
+
+            std::vector<std::vector<double>> inflatedPath = path;
+
+            bool isClosed = (std::abs(path.front()[0] - path.back()[0]) < 1e-5 && 
+                             std::abs(path.front()[1] - path.back()[1]) < 1e-5);
+
+            int loopCount = isClosed ? n - 1 : n;
+
+            for (int p = 0; p < loopCount; p++) {
+                int prev_p, next_p;
+                if (isClosed) {
+                    prev_p = (p - 1 + loopCount) % loopCount;
+                    next_p = (p + 1) % loopCount;
+                } else {
+                    prev_p = (p > 0) ? p - 1 : p;
+                    next_p = (p < n - 1) ? p + 1 : p;
+                }
+
+                // Normal vector of the incoming segment
+                double dx_in = path[p][0] - path[prev_p][0];
+                double dy_in = path[p][1] - path[prev_p][1];
+                double len_in = std::sqrt(dx_in * dx_in + dy_in * dy_in);
+                double nx_in = 0.0, ny_in = 0.0;
+                if (len_in > 1e-6) {
+                    if (isClockwise) {
+                        nx_in = -dy_in / len_in;
+                        ny_in = dx_in / len_in;
+                    } else {
+                        nx_in = dy_in / len_in;
+                        ny_in = -dx_in / len_in;
+                    }
+                }
+
+                // Normal vector of the outgoing segment
+                double dx_out = path[next_p][0] - path[p][0];
+                double dy_out = path[next_p][1] - path[p][1];
+                double len_out = std::sqrt(dx_out * dx_out + dy_out * dy_out);
+                double nx_out = 0.0, ny_out = 0.0;
+                if (len_out > 1e-6) {
+                    if (isClockwise) {
+                        nx_out = -dy_out / len_out;
+                        ny_out = dx_out / len_out;
+                    } else {
+                        nx_out = dy_out / len_out;
+                        ny_out = -dx_out / len_out;
+                    }
+                }
+
+                // Bisector normal
+                double nx = nx_in + nx_out;
+                double ny = ny_in + ny_out;
+                double len = std::sqrt(nx * nx + ny * ny);
+                if (len > 1e-6) {
+                    nx /= len;
+                    ny /= len;
+                } else {
+                    nx = nx_in;
+                    ny = ny_in;
+                }
+
+                // Displace vertex outward
+                inflatedPath[p][0] += inflateDistance * nx;
+                inflatedPath[p][1] += inflateDistance * ny;
+            }
+
+            // Sync the duplicate end point for closed paths
+            if (isClosed) {
+                inflatedPath[n - 1][0] = inflatedPath[0][0];
+                inflatedPath[n - 1][1] = inflatedPath[0][1];
+            }
+
+            path = inflatedPath;
+        }
     }
 
     _ReportProgress(options, STAGE_TRACE_PATHS, 60);
+
     PathTracer tracer;
     std::vector<std::vector<std::vector<std::vector<double> > > > layers = tracer.BatchTracePaths(batchInternodes,
 					  options.fLineThreshold,
