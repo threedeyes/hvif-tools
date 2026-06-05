@@ -280,14 +280,16 @@ int main(int argc, char** argv) {
 
         if (hvifOk && !hvifBuffer.empty()) {
             haiku::Icon hvifIcon = haiku::IconConverter::LoadFromBuffer(hvifBuffer, haiku::FORMAT_HVIF);
-            std::string b64 = base64_encode(hvifBuffer.data(), hvifBuffer.size());
-            hvifJson = ", \"hvif\": {"
-                       "\"base64\": \"" + b64 + "\", "
-                       "\"size\": " + std::to_string(hvifBuffer.size()) + ", "
-                       "\"styles\": " + std::to_string(hvifIcon.styles.size()) + ", "
-                       "\"paths\": " + std::to_string(hvifIcon.paths.size()) + ", "
-                       "\"shapes\": " + std::to_string(hvifIcon.shapes.size()) +
-                       "}";
+            if (!hvifIcon.styles.empty() && !hvifIcon.paths.empty() && !hvifIcon.shapes.empty()) {
+                std::string b64 = base64_encode(hvifBuffer.data(), hvifBuffer.size());
+                hvifJson = ", \"hvif\": {"
+                           "\"base64\": \"" + b64 + "\", "
+                           "\"size\": " + std::to_string(hvifBuffer.size()) + ", "
+                           "\"styles\": " + std::to_string(hvifIcon.styles.size()) + ", "
+                           "\"paths\": " + std::to_string(hvifIcon.paths.size()) + ", "
+                           "\"shapes\": " + std::to_string(hvifIcon.shapes.size()) +
+                           "}";
+            }
         }
 
         std::string jsonResponse = "{\"timeMs\": " + std::to_string(time_ms) +

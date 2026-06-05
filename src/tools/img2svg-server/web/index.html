@@ -735,7 +735,7 @@
                 document.getElementById('infoSvgGrads').innerText = grads.length;
 
                 const blockHvif = document.getElementById('blockHvif');
-                if (data.hvif) {
+                if (data.hvif && data.hvif.styles > 0 && data.hvif.paths > 0 && data.hvif.shapes > 0) {
                     blockHvif.classList.remove('hidden');
                     
                     // Convert Base64 to binary array
